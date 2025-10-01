@@ -1,0 +1,74 @@
+# Test query đơn giản để kiểm tra
+query GetProducts {
+  products(first: 5) {
+    edges {
+      node {
+        id
+        name
+        basePrice
+        category {
+          name
+        }
+      }
+    }
+  }
+}
+
+# Test query lấy danh mục
+query GetCategories {
+  categories(first: 10) {
+    edges {
+      node {
+        id
+        name
+        description
+        productCount
+        isActive
+      }
+    }
+  }
+}
+
+# Test mutation tạo sản phẩm mới
+mutation CreateProduct {
+  productCreate(
+    input: {
+      name: "Giày Nike Air Max"
+      description: "Giày thể thao cao cấp"
+      categoryId: 1
+      basePrice: "2500000"
+      imageUrl: "https://example.com/nike-air-max.jpg"
+    }
+  ) {
+    success
+    errors
+    product {
+      id
+      name
+      basePrice
+    }
+  }
+}
+
+# Test mutation tạo biến thể sản phẩm
+mutation CreateProductVariant {
+  productVariantCreate(
+    input: {
+      productId: 1
+      sku: "NIKE-AIR-MAX-SIZE-42"
+      price: "2500000"
+      stock: 50
+      weight: "0.8"
+    }
+  ) {
+    success
+    errors
+    productVariant {
+      id
+      sku
+      price
+      stock
+      isInStock
+    }
+  }
+}

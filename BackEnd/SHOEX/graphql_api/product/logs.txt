@@ -1,0 +1,12 @@
+Đây là dự án sàn thương mại bán dày dép có nhiều người bán chung trên sàn.
+Hãy triển khai graphql của dự án này cho tôi.SHOEX.
+Tôi đã có model trong các app
+Hãy triển khai graphql dành cho app product trước đã 
+model gốc :D:\PBL6\BackEnd\SHOEX\products\models.py
+D:\PBL6\BackEnd\SHOEX\graphql\product\types\product.py : triển khai type với các thuộc tính cần thiết để thể hiện đầy đủ cho sản phẩm và giao diện của trình bày sản phẩm : (Tham khảo các giao diện trình bày sản phẩm của shoppe và tiktok)
+Triển khai  trong thư mục graphql/product :D:\PBL6\BackEnd\SHOEX\graphql\product\dataloaders
+D:\PBL6\BackEnd\SHOEX\graphql\product\bulk_mutations
+D:\PBL6\BackEnd\SHOEX\graphql\product\filters
+D:\PBL6\BackEnd\SHOEX\graphql\product\mutations
+
+tổng hợp API vào D:\TEST\saleor\saleor\graphql\api.py. Xem cách của saleor để triển khai tương tự nhưng không quá rối . 

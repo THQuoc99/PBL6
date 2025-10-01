@@ -1,0 +1,4 @@
+Chạy file từ terminal........BackEnd : manage.py runserver
+
+python manage.py makemigrations
+python manage.py migrate
