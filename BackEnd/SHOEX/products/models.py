@@ -1,7 +1,7 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 import json
-
+from django.utils.text import slugify
 # Create your models here.
 
 class Category(models.Model):
@@ -51,6 +51,7 @@ class Product(models.Model):
         primary_key=True,
         verbose_name="Mã sản phẩm"
     )
+    slug = models.SlugField(unique=True, blank=True)
     seller = models.ForeignKey(
         'users.User',
         on_delete=models.CASCADE,
@@ -77,7 +78,6 @@ class Product(models.Model):
         verbose_name="Giá cơ bản",
         help_text="Giá tham khảo, giá thực tế sẽ theo variant"
     )
-    # Bỏ image_url vì đã có bảng ProductImage riêng
     
     # Thông tin bổ sung
     brand = models.CharField(
@@ -90,7 +90,8 @@ class Product(models.Model):
         max_length=100,
         blank=True,
         null=True,
-        verbose_name="Mã model"
+        verbose_name="Mã model",
+        unique=True
     )
     
     # Metadata
@@ -122,14 +123,21 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
-
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        if not self.model_code:
+            # Đếm xem hiện có bao nhiêu sản phẩm
+            count = Product.objects.count() + 1
+            # Gộp lại: prefix + số thứ tự (4 chữ số)
+            self.model_code = f"PRD-{count:04d}"
+        super().save(*args, **kwargs)
     @property
     def min_price(self):
         """Giá thấp nhất từ variants"""
         return self.variants.filter(is_active=True).aggregate(
             models.Min('price')
         )['price__min'] or self.base_price
-
     @property  
     def max_price(self):
         """Giá cao nhất từ variants"""
@@ -231,12 +239,12 @@ class ProductAttributeOption(models.Model):
         verbose_name="Mã giá trị",
         help_text="VD: #000000 cho màu đen, XL cho size..."
     )
-    image_url = models.URLField(
-        max_length=500,
+    image = models.ImageField(
+        upload_to='products/attributes/%Y/%m/',
         blank=True,
         null=True,
-        verbose_name="URL ảnh",
-        help_text="Ảnh cho tùy chọn này (nếu attribute.has_image = True)"
+        verbose_name="Ảnh",
+        help_text="Upload ảnh cho tùy chọn này (nếu attribute.has_image = True)"
     )
     display_order = models.IntegerField(
         default=0,
@@ -292,6 +300,13 @@ class ProductAttributeOption(models.Model):
         
         return combinations
 
+    @property
+    def image_url(self):
+        """Trả về URL của ảnh (backward compatibility)"""
+        if self.image:
+            return self.image.url
+        return None
+    
     def __str__(self):
         return f"{self.product.name} - {self.attribute.name}: {self.value}"
 
@@ -431,10 +446,10 @@ class ProductImage(models.Model):
         help_text="Sản phẩm chứa ảnh này"
     )
     
-    image_url = models.URLField(
-        max_length=500,
-        verbose_name="URL ảnh",
-        help_text="Đường dẫn URL đến ảnh"
+    image = models.ImageField(
+        upload_to='products/gallery/%Y/%m/',
+        verbose_name="Ảnh sản phẩm",
+        help_text="Upload ảnh sản phẩm"
     )
     
     is_thumbnail = models.BooleanField(
@@ -472,6 +487,13 @@ class ProductImage(models.Model):
                 name='unique_product_thumbnail'
             ),
         ]
+    
+    @property
+    def image_url(self):
+        """Trả về URL của ảnh (backward compatibility)"""
+        if self.image:
+            return self.image.url
+        return None
     
     def __str__(self):
         img_type = "Ảnh đại diện" if self.is_thumbnail else "Ảnh chính"

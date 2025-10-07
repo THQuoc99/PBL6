@@ -64,7 +64,7 @@ if __name__ == "__main__":
     data = get_all_data()
 
     # Lưu vào file JSON
-    filename = "vietnam_provinces_complete.json"
+    filename = "vietnam.json"
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
