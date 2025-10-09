@@ -25,7 +25,11 @@ SECRET_KEY = 'django-insecure-comt3wg=&xj9(xkg*rzl$p$nwr-8nxavr*i@niopu7n_dixjz0
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    '127.0.0.1', 
+    'localhost', 
+    'successive-idella-unsparingly.ngrok-free.dev'
+]
 
 
 # Application definition

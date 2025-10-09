@@ -2,7 +2,7 @@ import os
 import sys
 
 # Thêm đường dẫn tới project Django
-sys.path.append(r"D:\PBL6\BackEnd\SHOEX")
+sys.path.append(r"D:\Mobile\App_futter\test\PBL6\BackEnd\SHOEX")
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "SHOEX.config.settings")
 

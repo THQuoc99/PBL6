@@ -1,14 +1,19 @@
 from django.db import models
 
-# Create your models here.
-
 class Payment(models.Model):
+    
     PAYMENT_METHOD_CHOICES = [
         ('credit_card', 'Credit Card'),
         ('bank_transfer', 'Bank Transfer'),
         ('cod', 'Cash on Delivery'),
+    ] 
+    
+    PAYMENT_METHOD_CHOICES = [
+        ('paypal', 'PayPal'),
+        ('vnpay', 'VNPay'),
+        ('cod', 'Cash on Delivery'),
     ]
-
+    
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('completed', 'Completed'),
