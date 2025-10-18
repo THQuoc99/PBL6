@@ -42,7 +42,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     "graphene_django",
-    "chatbot", 
+    "chatbot",
+    "corsheaders", 
     "users",     
     "products",   
     "cart",      # Thêm app cart
@@ -62,7 +63,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'config.urls'
 
@@ -84,9 +88,9 @@ TEMPLATES = [
 WSGI_APPLICATION = 'config.wsgi.application'
 
 # GraphQL Configuration
-# GRAPHENE = {
-#     "SCHEMA": "graphql.api.schema",  # Đường dẫn đến schema của bạn
-# }
+GRAPHENE = {
+    "SCHEMA": "graphql_api.api.schema",  # Đường dẫn đến schema
+}
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 import os
@@ -144,3 +148,6 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+import os
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "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")
