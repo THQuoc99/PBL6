@@ -27,6 +27,13 @@ class Category(models.Model):
         related_name='subcategories',
         verbose_name="Danh mục cha"
     )
+    thumbnail_image = models.ImageField(
+        upload_to='categories/thumbnails/',
+        blank=True,
+        null=True,
+        verbose_name="Ảnh đại diện danh mục",
+        help_text="Ảnh thumbnail cho danh mục"
+    )
     is_active = models.BooleanField(
         default=True,
         verbose_name="Hoạt động"

@@ -60,7 +60,17 @@ class CategoryCreateInput(InputObjectType):
     name = graphene.String(required=True, description="Tên danh mục")
     description = graphene.String(description="Mô tả danh mục")
     parent_id = graphene.Int(description="ID danh mục cha")
+    thumbnail_image_url = graphene.String(description="URL ảnh đại diện danh mục")
     is_active = graphene.Boolean(default_value=True, description="Trạng thái")
+
+
+class CategoryUpdateInput(InputObjectType):
+    """Input cho cập nhật danh mục"""
+    name = graphene.String(description="Tên danh mục")
+    description = graphene.String(description="Mô tả danh mục")
+    parent_id = graphene.Int(description="ID danh mục cha")
+    thumbnail_image_url = graphene.String(description="URL ảnh đại diện danh mục")
+    is_active = graphene.Boolean(description="Trạng thái")
 
 
 # ===== PRODUCT MUTATIONS =====
@@ -506,12 +516,20 @@ class CategoryCreate(Mutation):
                     )
             
             # Tạo category
-            category = Category.objects.create(
-                name=input.name,
-                description=input.get('description'),
-                parent=parent,
-                is_active=input.get('is_active', True)
-            )
+            category_data = {
+                'name': input.name,
+                'description': input.get('description'),
+                'parent': parent,
+                'is_active': input.get('is_active', True)
+            }
+            
+            # Xử lý thumbnail image nếu có
+            if input.get('thumbnail_image_url'):
+                # TODO: Implement image upload logic
+                # Có thể sử dụng Django's ImageField hoặc xử lý URL
+                category_data['thumbnail_image'] = input.thumbnail_image_url
+            
+            category = Category.objects.create(**category_data)
             
             return CategoryCreate(
                 success=True,

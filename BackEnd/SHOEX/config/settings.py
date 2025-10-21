@@ -94,14 +94,23 @@ from pathlib import Path
 import dj_database_url
 import os
 
+# DATABASES = {
+#     'default': dj_database_url.config(
+#         default="postgresql://shoexdata_user:9iJnTZrmoK5e2BmONYOO8kStol4xgeRe@dpg-d35s6dali9vc738mdev0-a.oregon-postgres.render.com/shoexdata",
+#         conn_max_age=600,
+#         ssl_require=True
+#     )
+# }
 DATABASES = {
-    'default': dj_database_url.config(
-        default="postgresql://shoexdata_user:9iJnTZrmoK5e2BmONYOO8kStol4xgeRe@dpg-d35s6dali9vc738mdev0-a.oregon-postgres.render.com/shoexdata",
-        conn_max_age=600,
-        ssl_require=True
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'shoex',        # tên database bạn tạo local (vd: shoexdata)
+        'USER': 'postgres',         # user mặc định PostgreSQL local
+        'PASSWORD': 'admin',# thay bằng mật khẩu bạn đặt khi cài PostgreSQL
+        'HOST': 'localhost',        # local database
+        'PORT': '5432',             # cổng mặc định PostgreSQL
+    }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

@@ -28,7 +28,12 @@ class CategoryType(DjangoObjectType):
         return self.products.filter(is_active=True).count()
     
     def resolve_thumbnail_image(self, info):
-        """Lấy ảnh đại diện từ sản phẩm nổi bật đầu tiên"""
+        """Lấy ảnh đại diện của danh mục"""
+        # Ưu tiên: Ảnh thumbnail riêng của category
+        if self.thumbnail_image and hasattr(self.thumbnail_image, 'url'):
+            return self.thumbnail_image.url
+        
+        # Fallback 1: Lấy từ sản phẩm nổi bật đầu tiên
         first_product = self.products.filter(
             is_active=True, 
             is_featured=True
@@ -38,7 +43,15 @@ class CategoryType(DjangoObjectType):
             thumbnail = first_product.gallery_images.filter(is_thumbnail=True).first()
             if thumbnail and thumbnail.image and hasattr(thumbnail.image, 'url'):
                 return thumbnail.image.url
-            return None
+        
+        # Fallback 2: Lấy từ sản phẩm active bất kỳ
+        any_product = self.products.filter(is_active=True).first()
+        if any_product:
+            thumbnail = any_product.gallery_images.filter(is_thumbnail=True).first()
+            if thumbnail and thumbnail.image and hasattr(thumbnail.image, 'url'):
+                return thumbnail.image.url
+        
+        # Không có ảnh nào
         return None
     
     def resolve_full_path(self, info):
@@ -192,14 +205,12 @@ class ProductType(DjangoObjectType):
     # ===== THÔNG TIN CƠ BẢN =====
     seller_name = graphene.String(description="Tên người bán")
     seller_avatar = graphene.String(description="Avatar người bán")
-    
     # ===== GIÁ CẢ & KHUYẾN MÃI =====
     price_range = graphene.String(description="Khoảng giá")
     min_price = graphene.Decimal(description="Giá thấp nhất")
     max_price = graphene.Decimal(description="Giá cao nhất")
     discount_percentage = graphene.Float(description="% giảm giá cao nhất")
     has_discount = graphene.Boolean(description="Có giảm giá không")
-    
     # ===== HÌNH ẢNH THEO MODEL MỚI =====
     gallery_images = graphene.List(ProductImageType, description="Ảnh gallery sản phẩm")
     thumbnail_image = graphene.Field(ProductImageType, description="Ảnh đại diện")

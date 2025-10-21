@@ -13,4 +13,5 @@ tổng hợp API vào D:\TEST\saleor\saleor\graphql\api.py. Xem cách của sale
 
 
 ĐIỀU HỌC ĐƯỢC QUAN LÀM ĐỒ ÁN NÀY :
-Triển khai được graphql -> trong đó có kĩ thuật (relay. node ) đây là phương pháp để truy vấn toàn cục cho việc lấy đói tượng theo id . 
+Triển khai được graphql -> trong đó có kĩ thuật (relay. node ) đây là phương pháp để truy vấn toàn cục cho việc lấy đói tượng theo id .
+ 

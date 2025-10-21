@@ -1,29 +1,39 @@
+# ===== IMPORTS =====
 import graphene
 from django.db.models import Q, Exists, OuterRef, Count
 from graphene import relay
 from promise import Promise
+from django.db.models import Count, Q
 
+# ===== DJANGO MODELS =====
 from products.models import Product, ProductVariant, Category
 from graphene_django import DjangoConnectionField
 
-# Import types
+# ===== GRAPHQL TYPES =====
 from .types.product import (
+    # Product related types
     ProductType, 
-    ProductVariantType, 
-    CategoryType,
+    ProductVariantType,
     ProductCountableConnection,
     ProductVariantCountableConnection,
+    
+    # Category related types
+    CategoryType,
     CategoryCountableConnection
 )
 
-# Import filters
+# ===== FILTER INPUTS =====
 from .filters.product_filters import (
+    # Product filters
     ProductFilterInput,
     ProductVariantFilterInput,
+    
+    # Category filters
     CategoryFilterInput
 )
 
-# Import mutations
+# ===== MUTATIONS =====
+# Product & Variant mutations
 from .mutations.product_mutations import (
     ProductCreate,
     ProductUpdate,
@@ -31,67 +41,78 @@ from .mutations.product_mutations import (
     ProductVariantCreate,
     ProductVariantUpdate,
     ProductVariantDelete,
-    CategoryCreate,
-    CategoryUpdate,
-    CategoryDelete,
     StockUpdate,
     PriceUpdate
 )
 
+# Category mutations
+from .mutations.product_mutations import (
+    CategoryCreate,
+    CategoryUpdate,
+    CategoryDelete
+)
+
+# Image mutations (Product related)
 from .mutations.image_mutations import (
     UploadProductImage,
     UploadAttributeOptionImage,
     DeleteProductImage
 )
 
-# Import bulk mutations
+# Bulk mutations
 from .bulk_mutations import (
+    # Product bulk operations
     BulkProductCreate,
     BulkProductUpdate,
-    BulkProductVariantCreate,
-    BulkStockUpdate,
-    BulkPriceUpdate,
+    BulkProductDelete,
     BulkProductStatusUpdate,
+    
+    # Variant bulk operations
+    BulkProductVariantCreate,
     BulkVariantStatusUpdate,
     BulkVariantDelete,
-    BulkProductDelete,
+    
+    # Stock & Price bulk operations
+    BulkStockUpdate,
+    BulkPriceUpdate,
     BulkStockTransfer
 )
 
-# Import dataloaders
-from .dataloaders.product_loaders import (
-    CategoryByIdLoader,
-    ProductsBySellerLoader,
-    ProductVariantsByProductLoader
-)
-
+# ===== DATALOADERS =====
 
 class ProductQueries(graphene.ObjectType):
-    """Queries cho products trong SHOEX"""
+    """Queries cho products và categories trong SHOEX"""
     
-    # === SINGLE OBJECT QUERIES ===
-    product = graphene.Field(
-        ProductType,
-        id=graphene.Argument(graphene.ID, description="ID của sản phẩm"),
-        slug=graphene.Argument(graphene.String, description="Slug của sản phẩm"),
-        description="Lấy thông tin một sản phẩm"
-    )
-    
-    product_variant = graphene.Field(
-        ProductVariantType,
-        id=graphene.Argument(graphene.ID, description="ID của biến thể"),
-        sku=graphene.Argument(graphene.String, description="SKU của biến thể"),
-        description="Lấy thông tin một biến thể sản phẩm"
-    )
-    
+    # ===== CATEGORY QUERIES =====
+    # Single category query
     category = graphene.Field(
         CategoryType,
         id=graphene.Argument(graphene.ID, description="ID của danh mục"),
         slug=graphene.Argument(graphene.String, description="Slug của danh mục"),
-        description="Lấy thông tin một danh mục"
+        description="Lấy thông tin một danh mục cụ thể"
     )
     
-    # === COLLECTION QUERIES ===
+    # Category collection query
+    categories = graphene.ConnectionField(
+        CategoryCountableConnection,
+        filter=CategoryFilterInput(description="Bộ lọc danh mục"),
+        sortBy=graphene.Argument(
+            graphene.String,
+            description="Sắp xếp theo: name_asc, name_desc, created_at_desc, product_count_desc"
+        ),
+        description="Danh sách tất cả danh mục với pagination"
+    )
+
+    # ===== PRODUCT QUERIES =====
+    # Single product query
+    product = graphene.Field(
+        ProductType,
+        id=graphene.Argument(graphene.ID, description="ID của sản phẩm"),
+        slug=graphene.Argument(graphene.String, description="Slug của sản phẩm"),
+        description="Lấy thông tin một sản phẩm cụ thể"
+    )
+    
+    # Product collection query
     products = graphene.ConnectionField(
         ProductCountableConnection,
         filter=ProductFilterInput(description="Bộ lọc sản phẩm"),
@@ -100,9 +121,19 @@ class ProductQueries(graphene.ObjectType):
             description="Sắp xếp theo: price_asc, price_desc, name_asc, name_desc, created_at_desc, rating_desc, sales_desc"
         ),
         search=graphene.Argument(graphene.String, description="Tìm kiếm theo tên sản phẩm"),
-        description="Danh sách tất cả sản phẩm"
+        description="Danh sách tất cả sản phẩm với pagination"
     )
     
+    # ===== PRODUCT VARIANT QUERIES =====
+    # Single variant query
+    product_variant = graphene.Field(
+        ProductVariantType,
+        id=graphene.Argument(graphene.ID, description="ID của biến thể"),
+        sku=graphene.Argument(graphene.String, description="SKU của biến thể"),
+        description="Lấy thông tin một biến thể sản phẩm cụ thể"
+    )
+    
+    # Variant collection query
     product_variants = graphene.ConnectionField(
         ProductVariantCountableConnection,
         filter=ProductVariantFilterInput(description="Bộ lọc biến thể"),
@@ -110,26 +141,18 @@ class ProductQueries(graphene.ObjectType):
             graphene.String,
             description="Sắp xếp theo: price_asc, price_desc, stock_asc, stock_desc, created_at_desc"
         ),
-        description="Danh sách tất cả biến thể sản phẩm"
+        description="Danh sách tất cả biến thể sản phẩm với pagination"
     )
     
-    categories = graphene.ConnectionField(
-        CategoryCountableConnection,
-        filter=CategoryFilterInput(description="Bộ lọc danh mục"),
-        sort_by=graphene.Argument(
-            graphene.String,
-            description="Sắp xếp theo: name_asc, name_desc, created_at_desc, product_count_desc"
-        ),
-        description="Danh sách tất cả danh mục"
-    )
-    
-    # === SPECIAL QUERIES ===
+    # ===== SPECIALIZED PRODUCT QUERIES =====
+    # Featured products
     featured_products = graphene.ConnectionField(
         ProductCountableConnection,
         first=graphene.Int(description="Số lượng sản phẩm nổi bật"),
         description="Sản phẩm nổi bật (rating cao, bán chạy)"
     )
     
+    # Products by seller
     products_by_seller = graphene.ConnectionField(
         ProductCountableConnection,
         seller_id=graphene.Argument(graphene.ID, required=True, description="ID của seller"),
@@ -137,6 +160,7 @@ class ProductQueries(graphene.ObjectType):
         description="Sản phẩm của một seller cụ thể"
     )
     
+    # Products by category
     products_by_category = graphene.ConnectionField(
         ProductCountableConnection,
         category_id=graphene.Argument(graphene.ID, required=True, description="ID của danh mục"),
@@ -144,7 +168,8 @@ class ProductQueries(graphene.ObjectType):
         description="Sản phẩm trong một danh mục cụ thể"
     )
     
-    # === SEARCH QUERIES ===
+    # ===== SEARCH QUERIES =====
+    # Full-text product search
     search_products = graphene.ConnectionField(
         ProductCountableConnection,
         query=graphene.Argument(graphene.String, required=True, description="Từ khóa tìm kiếm"),
@@ -152,38 +177,10 @@ class ProductQueries(graphene.ObjectType):
         description="Tìm kiếm sản phẩm toàn văn"
     )
     
-    # === RESOLVERS ===
-    
-    def resolve_product(self, info, id=None, slug=None):
-        """Resolve single product"""
-        if id:
-            try:
-                return Product.objects.get(product_id=id, is_active=True)
-            except Product.DoesNotExist:
-                return None
-        elif slug:
-            try:
-                return Product.objects.get(slug=slug, is_active=True)
-            except Product.DoesNotExist:
-                return None
-        return None
-    
-    def resolve_product_variant(self, info, id=None, sku=None):
-        """Resolve single product variant"""
-        if id:
-            try:
-                return ProductVariant.objects.get(variant_id=id, is_active=True)
-            except ProductVariant.DoesNotExist:
-                return None
-        elif sku:
-            try:
-                return ProductVariant.objects.get(sku=sku, is_active=True)
-            except ProductVariant.DoesNotExist:
-                return None
-        return None
+    # ===== CATEGORY RESOLVERS =====
     
     def resolve_category(self, info, id=None, slug=None):
-        """Resolve single category"""
+        """Resolve single category by ID or slug"""
         if id:
             try:
                 return Category.objects.get(category_id=id, is_active=True)
@@ -196,6 +193,74 @@ class ProductQueries(graphene.ObjectType):
                 return None
         return None
     
+
+    def resolve_categories(self, info, **kwargs):
+        """Resolve categories list with filtering and sorting"""
+        qs = Category.objects.all()
+
+        # --- 1️⃣ Lọc theo filter ---
+        filter_data = kwargs.get('filter', {})
+        if filter_data:
+            if 'isActive' in filter_data:
+                qs = qs.filter(is_active=filter_data['isActive'])
+            if 'parentId' in filter_data:
+                # parentId = None → danh mục gốc
+                parent_id = filter_data['parentId']
+                if parent_id is None:
+                    qs = qs.filter(parent__isnull=True)
+                else:
+                    qs = qs.filter(parent_id=parent_id)
+            if 'search' in filter_data:
+                qs = qs.filter(name__icontains=filter_data['search'])
+            if 'hasProducts' in filter_data and filter_data['hasProducts']:
+                qs = qs.annotate(product_count=Count('products')).filter(product_count__gt=0)
+
+        # --- 2️⃣ Sắp xếp (sort) ---
+        sort_by = kwargs.get('sortBy', 'name_asc')
+        if sort_by == 'name_asc':
+            qs = qs.order_by('name')
+        elif sort_by == 'name_desc':
+            qs = qs.order_by('-name')
+        elif sort_by == 'created_at_desc':
+            qs = qs.order_by('-created_at')
+        elif sort_by == 'product_count_desc':
+            qs = qs.annotate(product_count=Count('products')).order_by('-product_count')
+
+        return qs
+
+    
+    # ===== PRODUCT RESOLVERS =====
+    
+    def resolve_product(self, info, id=None, slug=None):
+        """Resolve single product by ID or slug"""
+        if id:
+            try:
+                return Product.objects.get(product_id=id, is_active=True)
+            except Product.DoesNotExist:
+                return None
+        elif slug:
+            try:
+                return Product.objects.get(slug=slug, is_active=True)
+            except Product.DoesNotExist:
+                return None
+        return None
+    
+    # ===== PRODUCT VARIANT RESOLVERS =====
+    
+    def resolve_product_variant(self, info, id=None, sku=None):
+        """Resolve single product variant by ID or SKU"""
+        if id:
+            try:
+                return ProductVariant.objects.get(variant_id=id, is_active=True)
+            except ProductVariant.DoesNotExist:
+                return None
+        elif sku:
+            try:
+                return ProductVariant.objects.get(sku=sku, is_active=True)
+            except ProductVariant.DoesNotExist:
+                return None
+        return None
+
     def resolve_products(self, info, **kwargs):
         """Resolve products list with filtering and sorting"""
         qs = Product.objects.filter(is_active=True).select_related('category', 'seller')
@@ -230,7 +295,7 @@ class ProductQueries(graphene.ObjectType):
         return qs
     
     def resolve_product_variants(self, info, **kwargs):
-        """Resolve product variants list"""
+        """Resolve product variants list with filtering and sorting"""
         qs = ProductVariant.objects.filter(is_active=True).select_related('product')
         
         # Apply sorting
@@ -248,28 +313,10 @@ class ProductQueries(graphene.ObjectType):
         
         return qs
     
-    def resolve_categories(self, info, **kwargs):
-        """Resolve categories list with filtering and sorting"""
-        qs = Category.objects.filter(is_active=True)
-        
-        sort_by = kwargs.get("sort_by", "name_asc")
-
-        if sort_by == "name_asc":
-            qs = qs.order_by("name")
-        elif sort_by == "name_desc":
-            qs = qs.order_by("-name")
-        elif sort_by == "created_at_desc":
-            qs = qs.order_by("-created_at")
-        elif sort_by == "product_count_desc":
-            # Count products in each category
-            qs = qs.annotate(
-                product_count=Count('products', filter=Q(products__is_active=True))
-            ).order_by("-product_count")
-
-        return qs
+    # ===== SPECIALIZED PRODUCT RESOLVERS =====
     
     def resolve_featured_products(self, info, **kwargs):
-        """Resolve featured products"""
+        """Resolve featured products based on ratings and sales"""
         first = kwargs.get('first', 20)
         
         # TODO: Implement proper featured logic based on ratings, sales, etc.
@@ -278,7 +325,7 @@ class ProductQueries(graphene.ObjectType):
         return qs
     
     def resolve_products_by_seller(self, info, seller_id, **kwargs):
-        """Resolve products by seller"""
+        """Resolve products by specific seller"""
         qs = Product.objects.filter(
             seller_id=seller_id,
             is_active=True
@@ -287,7 +334,7 @@ class ProductQueries(graphene.ObjectType):
         return qs
     
     def resolve_products_by_category(self, info, category_id, **kwargs):
-        """Resolve products by category"""
+        """Resolve products by specific category"""
         qs = Product.objects.filter(
             category_id=category_id,
             is_active=True
@@ -295,15 +342,17 @@ class ProductQueries(graphene.ObjectType):
         
         return qs
     
+    # ===== SEARCH RESOLVERS =====
+    
     def resolve_search_products(self, info, query, **kwargs):
-        """Full-text search products"""
+        """Full-text search products with relevance ranking"""
         qs = Product.objects.filter(
             Q(name__icontains=query) | 
             Q(description__icontains=query),
             is_active=True
         ).select_related('category', 'seller')
         
-        # Boost exact matches
+        # Boost exact matches for better relevance
         qs = qs.extra(
             select={
                 'name_match': "CASE WHEN name ILIKE %s THEN 1 ELSE 0 END",
@@ -316,35 +365,53 @@ class ProductQueries(graphene.ObjectType):
 
 
 class ProductMutations(graphene.ObjectType):
-    """Mutations cho products trong SHOEX"""
+    """Mutations cho products và categories trong SHOEX"""
     
-    # === PRODUCT MUTATIONS ===
-    product_create = ProductCreate.Field()
-    product_update = ProductUpdate.Field()
-    product_delete = ProductDelete.Field()
-    
-    # === PRODUCT VARIANT MUTATIONS ===
-    product_variant_create = ProductVariantCreate.Field()
-    product_variant_update = ProductVariantUpdate.Field()
-    product_variant_delete = ProductVariantDelete.Field()
-    
-    # === CATEGORY MUTATIONS ===
+    # ===== CATEGORY MUTATIONS =====
+    # Category CRUD operations
     category_create = CategoryCreate.Field()
     category_update = CategoryUpdate.Field()
     category_delete = CategoryDelete.Field()
     
-    # === STOCK & PRICE MUTATIONS ===
+    # ===== PRODUCT MUTATIONS =====
+    # Product CRUD operations
+    product_create = ProductCreate.Field()
+    product_update = ProductUpdate.Field()
+    product_delete = ProductDelete.Field()
+    
+    # ===== PRODUCT VARIANT MUTATIONS =====
+    # Product variant CRUD operations
+    product_variant_create = ProductVariantCreate.Field()
+    product_variant_update = ProductVariantUpdate.Field()
+    product_variant_delete = ProductVariantDelete.Field()
+    
+    # ===== STOCK & PRICE MUTATIONS =====
+    # Inventory and pricing operations
     stock_update = StockUpdate.Field()
     price_update = PriceUpdate.Field()
     
-    # === IMAGE MUTATIONS ===
+    # ===== IMAGE MUTATIONS =====
+    # Image upload and management operations
     upload_product_image = UploadProductImage.Field()
     upload_attribute_option_image = UploadAttributeOptionImage.Field()
     delete_product_image = DeleteProductImage.Field()
     
-    # === BULK MUTATIONS ===
+    # ===== BULK OPERATIONS =====
+    # Bulk product operations
     bulk_product_create = BulkProductCreate.Field()
     bulk_product_update = BulkProductUpdate.Field()
+    bulk_product_delete = BulkProductDelete.Field()
+    bulk_product_status_update = BulkProductStatusUpdate.Field()
+    
+    # Bulk variant operations
+    bulk_product_variant_create = BulkProductVariantCreate.Field()
+    bulk_variant_status_update = BulkVariantStatusUpdate.Field()
+    bulk_variant_delete = BulkVariantDelete.Field()
+    
+    # Bulk stock & price operations
+    bulk_stock_update = BulkStockUpdate.Field()
+    bulk_price_update = BulkPriceUpdate.Field()
+    bulk_stock_transfer = BulkStockTransfer.Field()
     bulk_product_variant_create = BulkProductVariantCreate.Field()
     bulk_stock_update = BulkStockUpdate.Field()
     bulk_price_update = BulkPriceUpdate.Field()

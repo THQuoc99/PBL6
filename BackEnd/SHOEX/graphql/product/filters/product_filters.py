@@ -203,9 +203,9 @@ class ProductVariantFilterInput(InputObjectType):
 class CategoryFilterInput(InputObjectType):
     """Input cho Category filtering"""
     search = graphene.String(description="Tìm kiếm danh mục")
-    parent_id = graphene.Int(description="ID danh mục cha")
-    is_active = graphene.Boolean(description="Danh mục đang hoạt động")
-    has_products = graphene.Boolean(description="Có sản phẩm")
+    parentId = graphene.Int(description="ID danh mục cha (null = root categories)")
+    isActive = graphene.Boolean(description="Danh mục đang hoạt động")
+    hasProducts = graphene.Boolean(description="Có sản phẩm")
 
 
 # ===== HELPER FUNCTIONS =====

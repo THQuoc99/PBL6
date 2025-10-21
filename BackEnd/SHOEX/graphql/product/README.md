@@ -1,230 +1,1836 @@
-# Module Product - GraphQL API cho SHOEX
+# 📚 Module Product - GraphQL API Documentation cho SHOEX
 
-Module quản lý sản phẩm GraphQL toàn diện cho nền tảng thương mại điện tử SHOEX với **Hệ thống Variant, Attribute và Image Upload**.
+Tài liệu chi tiết về **GraphQL API sản phẩm** cho nền tảng thương mại điện tử SHOEX với hệ thống **Variant phức tạp, Attribute linh hoạt và Image Upload thực tế**.
 
-## 📁 Cấu trúc Module Thực Tế
+---
+
+## 📋 **MỤC LỤC**
+
+1. [📁 Cấu trúc Module](#-cấu-trúc-module)
+2. [🎯 Model Integration](#-model-integration)
+3. [🏷️ CATEGORY - Danh mục sản phẩm](#️-category---danh-mục-sản-phẩm)
+4. [🛍️ PRODUCT - Sản phẩm chính](#️-product---sản-phẩm-chính)
+5. [🎨 PRODUCT VARIANT - Biến thể](#-product-variant---biến-thể)
+6. [🖼️ IMAGE SYSTEM - Hệ thống ảnh](#️-image-system---hệ-thống-ảnh)
+7. [🔍 ADVANCED FEATURES - Tính năng nâng cao](#-advanced-features---tính-năng-nâng-cao)
+8. [🔧 Setup &amp; Integration](#-setup--integration)
+9. [📊 Performance &amp; Security](#-performance--security)
+
+---
+
+## 📁 **CẤU TRÚC MODULE**
 
 ```
 graphql/product/
-├── schema.py                       # Schema GraphQL chính - tổng hợp tất cả
-├── README.md                       # Tài liệu này
+├── schema.py                       # 🎯 Schema GraphQL chính - ProductQueries & ProductMutations
+├── README.md                       # 📚 Tài liệu này (bạn đang đọc)
 ├── types/
 │   ├── __init__.py
-│   └── product.py                  # Các kiểu GraphQL (ProductType, CategoryType, VariantType, ImageType)
+│   └── product.py                  # 🏗️ GraphQL Types: ProductType, CategoryType, VariantType, ImageType
 ├── mutations/
 │   ├── __init__.py
-│   ├── product_mutations.py        # Mutations CRUD sản phẩm
-│   └── image_mutations.py          # Mutations upload/quản lý ảnh
+│   ├── product_mutations.py        # ✏️ CRUD Operations: Create, Update, Delete
+│   └── image_mutations.py          # 📤 Image Upload: Upload, Delete ảnh
 ├── filters/
 │   ├── __init__.py
-│   └── product_filters.py          # Lọc và sắp xếp sản phẩm
+│   └── product_filters.py          # 🔍 Filtering: ProductFilterInput, CategoryFilterInput
 ├── dataloaders/
 │   ├── __init__.py
-│   └── product_loaders.py          # Tối ưu hóa truy vấn N+1
+│   └── product_loaders.py          # ⚡ Performance: Batch loading, N+1 optimization
 └── bulk_mutations/
     ├── __init__.py
-    ├── bulk_product_mutations.py   # Thao tác hàng loạt sản phẩm
-    └── bulk_variants_mutations.py  # Thao tác hàng loạt variants
+    ├── bulk_product_mutations.py   # 📦 Bulk Operations: Mass create, update, delete
+    └── bulk_variants_mutations.py  # 🔄 Variant Bulk: Mass variant operations
 ```
 
-## 🎯 Product Model Integration Thực Tế
+**📌 Vai trò từng file:**
 
-Module này tích hợp với hệ thống Product của SHOEX (`products/models.py`):
+- **`schema.py`**: Entry point chính, chứa ProductQueries và ProductMutations
+- **`types/product.py`**: Định nghĩa GraphQL types và Connection classes
+- **`mutations/`**: Tất cả operations thay đổi dữ liệu
+- **`filters/`**: Logic filtering và sorting cho queries
+- **`dataloaders/`**: Tối ưu performance với batch loading
+- **`bulk_mutations/`**: Operations hàng loạt cho admin/seller
+
+---
+
+## 🎯 **MODEL INTEGRATION**
+
+### **🏗️ Django Models Architecture**
+
+Module GraphQL này tích hợp với hệ thống Django models trong `products/models.py`:
 
 ```python
+# ===== CATEGORY MODEL =====
 class Category(models.Model):
-    """Danh mục sản phẩm - Cây phân cấp"""
-    category_id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True, null=True)
-    parent = models.ForeignKey('self', null=True, blank=True, related_name='subcategories')
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    """Danh mục sản phẩm - Hệ thống cây phân cấp"""
+    category_id = models.AutoField(primary_key=True)     # PK: 1, 2, 3...
+    name = models.CharField(max_length=100)              # "Giày thể thao"
+    description = models.TextField(blank=True, null=True) # Mô tả chi tiết
+    parent = models.ForeignKey('self', null=True, blank=True, related_name='subcategories')  # Cây phân cấp
+    is_active = models.BooleanField(default=True)        # Trạng thái hoạt động
+    created_at = models.DateTimeField(auto_now_add=True) # Thời gian tạo
 
+# ===== PRODUCT MODEL =====
 class Product(models.Model):
-    """Sản phẩm chính - Master data"""
-    product_id = models.AutoField(primary_key=True)
-    slug = models.SlugField(unique=True, blank=True)  # Auto-generated từ name
-    seller = models.ForeignKey('users.User', related_name='products')
-    category = models.ForeignKey(Category, related_name='products')
-    name = models.CharField(max_length=200)
-    description = models.TextField()
-    base_price = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
-    brand = models.CharField(max_length=100, blank=True, null=True)
-    model_code = models.CharField(max_length=100, unique=True)  # Auto: "PRD-0001"
-    is_active = models.BooleanField(default=True)
-    is_featured = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    """Sản phẩm chính - Master data với variants"""
+    product_id = models.AutoField(primary_key=True)      # PK: 1, 2, 3...
+    slug = models.SlugField(unique=True, blank=True)     # Auto: "nike-air-max-2024"
+    seller = models.ForeignKey('users.User', related_name='products')  # Người bán
+    category = models.ForeignKey(Category, related_name='products')     # Danh mục
+    name = models.CharField(max_length=200)              # "Nike Air Max 2024"
+    description = models.TextField()                     # Mô tả chi tiết HTML
+    base_price = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)  # Giá gốc
+    brand = models.CharField(max_length=100, blank=True, null=True)     # "Nike"
+    model_code = models.CharField(max_length=100, unique=True)          # Auto: "PRD-0001"
+    is_active = models.BooleanField(default=True)        # Hoạt động
+    is_featured = models.BooleanField(default=False)     # Nổi bật
+    created_at = models.DateTimeField(auto_now_add=True) # Ngày tạo
+    updated_at = models.DateTimeField(auto_now=True)     # Ngày cập nhật
 
-    # Properties
+    # 🧮 Computed Properties (từ variants)
     @property
-    def min_price(self): # Giá thấp nhất từ variants
+    def min_price(self):    # Giá thấp nhất từ active variants
     @property
-    def max_price(self): # Giá cao nhất từ variants
+    def max_price(self):    # Giá cao nhất từ active variants
     @property
-    def total_stock(self): # Tổng tồn kho từ variants
+    def total_stock(self):  # Tổng tồn kho từ tất cả variants
 
+# ===== PRODUCT VARIANT MODEL =====
 class ProductVariant(models.Model):
-    """Biến thể sản phẩm - SKU thực tế"""
-    variant_id = models.AutoField(primary_key=True)
-    product = models.ForeignKey(Product, related_name='variants')
-    sku = models.CharField(max_length=100, unique=True)
-    price = models.DecimalField(max_digits=12, decimal_places=2)
-    stock = models.IntegerField(default=0)
-    weight = models.DecimalField(max_digits=8, decimal_places=2, default=0.1)
-    option_combinations = models.JSONField()  # {"Size": "39", "Color": "Đen"}
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    """Biến thể sản phẩm - SKU cụ thể với thuộc tính"""
+    variant_id = models.AutoField(primary_key=True)      # PK: 1, 2, 3...
+    product = models.ForeignKey(Product, related_name='variants')  # Sản phẩm cha
+    sku = models.CharField(max_length=100, unique=True)  # "NIKE-AIR-MAX-39-BLACK"
+    price = models.DecimalField(max_digits=12, decimal_places=2)   # Giá cụ thể
+    stock = models.IntegerField(default=0)               # Tồn kho
+    weight = models.DecimalField(max_digits=8, decimal_places=2, default=0.1)  # Trọng lượng
+    option_combinations = models.JSONField()             # {"Size": "39", "Color": "Black"}
+    is_active = models.BooleanField(default=True)        # Hoạt động
+    created_at = models.DateTimeField(auto_now_add=True) # Ngày tạo
+    updated_at = models.DateTimeField(auto_now=True)     # Ngày cập nhật
 
-    # Properties
+    # 🎨 JSON Parsed Properties
     @property
-    def color_name(self): # Lấy màu từ option_combinations
+    def color_name(self):   # "Black" - parse từ option_combinations["Color"]
     @property
-    def size_name(self): # Lấy size từ option_combinations
+    def size_name(self):    # "39" - parse từ option_combinations["Size"]
     @property
-    def is_in_stock(self): # Kiểm tra còn hàng
+    def is_in_stock(self):  # stock > 0 && is_active == True
     @property
-    def color_image(self): # Lấy ảnh màu tương ứng
+    def color_image(self):  # Lấy ảnh màu từ ProductAttributeOption
 
+# ===== ATTRIBUTE SYSTEM =====
 class ProductAttribute(models.Model):
-    """Định nghĩa thuộc tính (Size, Color, Material...)"""
-    attribute_id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=50, unique=True)  # "Size", "Color"
-    type = models.CharField(max_length=10, choices=[
-        ('select', 'Lựa chọn từ danh sách'),
-        ('color', 'Màu sắc (có ảnh)'),
-        ('text', 'Nhập text'),
-        ('number', 'Số'),
+    """Định nghĩa thuộc tính sản phẩm (Size, Color, Material...)"""
+    attribute_id = models.AutoField(primary_key=True)    # PK: 1, 2, 3...
+    name = models.CharField(max_length=50, unique=True)  # "Size", "Color", "Material"
+    type = models.CharField(max_length=10, choices=[     # Loại thuộc tính:
+        ('select', 'Lựa chọn từ dropdown'),          #   - Dropdown list
+        ('color', 'Màu sắc với ảnh'),             #   - Color picker + image
+        ('text', 'Nhập text tự do'),               #   - Free text input
+        ('number', 'Nhập số'),                     #   - Number input
     ])
-    is_required = models.BooleanField(default=True)
-    has_image = models.BooleanField(default=False)  # Có ảnh riêng không
-    display_order = models.IntegerField(default=0)
+    is_required = models.BooleanField(default=True)      # Bắt buộc hay không
+    has_image = models.BooleanField(default=False)       # Có hỗ trợ ảnh không
+    display_order = models.IntegerField(default=0)       # Thứ tự hiển thị
     created_at = models.DateTimeField(auto_now_add=True)
 
 class ProductAttributeOption(models.Model):
-    """Tùy chọn thuộc tính cho từng sản phẩm"""
-    option_id = models.AutoField(primary_key=True)
-    product = models.ForeignKey(Product, related_name='attribute_options')
-    attribute = models.ForeignKey(ProductAttribute, related_name='product_options')
-    value = models.CharField(max_length=100)  # "39", "Đen", "Da thật"
+    """Tùy chọn cụ thể của thuộc tính cho mỗi sản phẩm"""
+    option_id = models.AutoField(primary_key=True)       # PK: 1, 2, 3...
+    product = models.ForeignKey(Product, related_name='attribute_options')      # Sản phẩm
+    attribute = models.ForeignKey(ProductAttribute, related_name='product_options')  # Thuộc tính
+    value = models.CharField(max_length=100)             # "39", "Black", "Leather"
     value_code = models.CharField(max_length=50, blank=True, null=True)  # "#000000", "XL"
-    image = models.ImageField(upload_to='products/attributes/%Y/%m/', blank=True, null=True)
-    display_order = models.IntegerField(default=0)
-    is_available = models.BooleanField(default=True)
+    image = models.ImageField(upload_to='products/attributes/%Y/%m/', blank=True, null=True)  # Ảnh option
+    display_order = models.IntegerField(default=0)       # Thứ tự sắp xếp
+    is_available = models.BooleanField(default=True)     # Còn sẵn có không
     created_at = models.DateTimeField(auto_now_add=True)
 
-    # Methods
-    def get_variants(self): # Lấy variants có tùy chọn này
-    def get_available_combinations(self): # Lấy kết hợp có sẵn
+    # 🔄 Helper Methods
+    def get_variants(self):              # Lấy tất cả variants có option này
+    def get_available_combinations(self): # Lấy các kết hợp option khác còn sẵn
     @property
-    def image_url(self): # URL ảnh cho backward compatibility
+    def image_url(self):                 # URL ảnh option
 
+# ===== IMAGE SYSTEM =====
 class ProductImage(models.Model):
-    """Ảnh sản phẩm với upload thật"""
-    image_id = models.AutoField(primary_key=True)
-    product = models.ForeignKey(Product, related_name='gallery_images')
-    image = models.ImageField(upload_to='products/gallery/%Y/%m/')  # Upload thật!
-    is_thumbnail = models.BooleanField(default=False)  # Chỉ 1 ảnh/product
-    alt_text = models.CharField(max_length=200, blank=True, null=True)
-    display_order = models.IntegerField(default=0)
+    """Ảnh sản phẩm với upload thực tế"""
+    image_id = models.AutoField(primary_key=True)        # PK: 1, 2, 3...
+    product = models.ForeignKey(Product, related_name='gallery_images')  # Sản phẩm
+    image = models.ImageField(upload_to='products/gallery/%Y/%m/')       # Upload thật!
+    is_thumbnail = models.BooleanField(default=False)    # Chỉ 1 thumbnail/product
+    alt_text = models.CharField(max_length=200, blank=True, null=True)   # SEO alt text
+    display_order = models.IntegerField(default=0)       # Thứ tự hiển thị
     created_at = models.DateTimeField(auto_now_add=True)
 
     @property
-    def image_url(self): # Trả về self.image.url
+    def image_url(self):                # Trả về self.image.url
 ```
 
-### Các tính năng đã triển khai:
+### **✨ Tính năng đã triển khai:**
 
-- **Auto Slug & Model Code**: Tự động tạo slug từ tên và model_code "PRD-0001"
-- **Hierarchical Categories**: Danh mục cây phân cấp với subcategories
-- **Complex Variant System**: Variants với JSON option_combinations
-- **Flexible Attributes**: 4 loại thuộc tính (select, color, text, number)
-- **Image Upload System**: Upload ảnh thật với ImageField, auto resize
-- **Multi-seller Support**: Mỗi sản phẩm thuộc về 1 seller
-- **Rich Media**: Quản lý ảnh với thumbnail unique và gallery
-- **Stock Management**: Tồn kho real-time ở cấp variant
-- **Price Flexibility**: Base price + variant price với min/max properties
+✅ **Auto Generation**: Slug và model_code tự động tạo
+✅ **Hierarchical Categories**: Cây danh mục vô hạn cấp
+✅ **Complex Variant System**: JSON option_combinations linh hoạt
+✅ **4-Type Attributes**: select, color, text, number
+✅ **Real Image Upload**: ImageField với auto resize
+✅ **Multi-seller Support**: Mỗi sản phẩm thuộc 1 seller
+✅ **Rich Media Management**: Thumbnail + gallery system
+✅ **Real-time Stock**: Tồn kho ở cấp variant
+✅ **Flexible Pricing**: Base price + variant-specific pricing
 
-## 🚀 Tính năng
+---
 
-### Kiểu GraphQL
+## 🏷️ **CATEGORY - DANH MỤC SẢN PHẨM**
 
-- **ProductType**: Sản phẩm với đầy đủ thông tin và quan hệ
-- **ProductVariantType**: Variant với stock, price, attributes
-- **CategoryType**: Danh mục với cây phân cấp
-- **ProductAttributeType**: Thuộc tính sản phẩm
-- **ProductAttributeOptionType**: Tùy chọn thuộc tính
-- **ProductImageType**: Ảnh sản phẩm
-- **Product/Variant/CategoryConnection**: Hỗ trợ phân trang
-
-### Truy vấn (Queries) Có sẵn
+### **� Cấu trúc CategoryType**
 
 ```graphql
-	# === QUERIES CƠ BẢN ===
-query {
-  # Health check
-  health
+type CategoryType {
+  # === THÔNG TIN CƠ BẢN ===
+  categoryId: ID! # Primary key: "1", "2", "3"
+  name: String! # "Giày thể thao", "Áo khoác"
+  description: String # Mô tả chi tiết danh mục
+  isActive: Boolean! # Trạng thái hoạt động
+  createdAt: DateTime! # Thời gian tạo
+  # === COMPUTED FIELDS ===
+  fullPath: String! # "Thời trang > Giày dép > Giày thể thao"
+  productCount: Int! # Số sản phẩm active trong danh mục
+  thumbnailImage: String # Ảnh đại diện từ sản phẩm featured đầu tiên
+  # === QUAN HỆ PHÂN CẤP ===
+  parent: CategoryType # Danh mục cha (null nếu là root)
+  subcategories: [CategoryType!]! # Danh sách danh mục con
+  # === QUAN HỆ VỚI SẢN PHẨM ===
+  products: ProductConnection # Sản phẩm trong danh mục (có pagination)
+}
+```
 
-  # Sản phẩm đơn lẻ
-  product(id: ID!) {
-    productId
-    name
-    slug
-    description
-    basePrice
-    minPrice  # từ variants
-    maxPrice  # từ variants
-    totalStock  # từ variants
-    brand
-    modelCode
-    isActive
-    isFeatured
-    createdAt
-    updatedAt
+### **🔍 CATEGORY QUERIES - TRUY VẤN DANH MỤC**
 
-    # Quan hệ
-    seller { username }
-    category { name, fullPath }
-    variants { edges { node { sku, price, stock } } }
-    galleryImages { imageUrl, isThumbnail }
-    thumbnailImage { imageUrl }
-    attributeOptions { value, imageUrl }
-  }
+#### **1️⃣ Lấy một danh mục cụ thể**
 
-  # Variant đơn lẻ
-  productVariant(id: ID!) {
-    variantId
-    sku
-    price
-    stock
-    weight
-    optionCombinations  # JSON
-    colorName    # từ optionCombinations
-    sizeName     # từ optionCombinations
-    isInStock    # computed
-    colorImageUrl  # từ color option
-    isActive
-
-    product { name }
-  }
-
-  # Danh mục đơn lẻ
-  category(id: ID!) {
+```graphql
+query GetSingleCategory($id: ID!) {
+  category(id: $id) {
     categoryId
     name
     description
-    fullPath     # computed path
-    productCount # số sản phẩm
-    thumbnailImage  # từ featured product
+    fullPath # "Thời trang > Giày dép > Giày thể thao"
+    productCount # 125 sản phẩm
+    thumbnailImage # URL ảnh đại diện
     isActive
-
+    createdAt
     # Cây phân cấp
-    parent { name }
-    subcategories { name }
+    parent {
+      categoryId
+      name
+      fullPath
+    }
+
+    subcategories {
+      categoryId
+      name
+      productCount
+
+      # Có thể lấy thêm cấp con (nested)
+      subcategories {
+        categoryId
+        name
+        productCount
+      }
+    }
+
+    # Sản phẩm trong danh mục (preview)
+    products(first: 5) {
+      edges {
+        node {
+          name
+          minPrice
+          thumbnailImage {
+            imageUrl
+          }
+        }
+      }
+    }
   }
 }
+```
+
+#### **3️⃣ Lấy cây danh mục hoàn chỉnh (3 cấp)**
+
+```graphql
+query GetCategoryTree {
+  categories(
+    filter: { isActive: true, parentId:null }
+    sortBy: ""
+  ) {
+    edges {
+      node {
+        categoryId
+        name
+        productCount
+        parent
+        {
+          name
+        }
+        subcategories {
+          categoryId
+          name
+          productCount
+          subcategories {
+            categoryId
+            name
+            productCount
+          }
+        }
+      }
+    }
+
+  }
+}
+```
+
+#### **4️⃣ Tìm kiếm danh mục**
+
+```graphql
+query SearchCategories($searchTerm: String!) {
+  categories(
+    filter: {
+      nameIcontains: $searchTerm # Tìm theo tên (không phân biệt hoa thường)
+      isActive: true
+      hasProducts: true # Chỉ danh mục có sản phẩm
+    }
+    sortBy: "product_count_desc" # Sắp xếp theo số sản phẩm nhiều nhất
+    first: 10
+  ) {
+    edges {
+      node {
+        categoryId
+        name
+        fullPath
+        productCount
+        description
+
+        # Top products trong danh mục
+        products(first: 3, sortBy: "price_asc") {
+          edges {
+            node {
+              name
+              minPrice
+              thumbnailImage {
+                imageUrl
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+# Variables:
+# { "searchTerm": "giày" }
+```
+
+### **🔧 CATEGORY MUTATIONS - THAY ĐỔI DANH MỤC**
+
+#### **1️⃣ Tạo danh mục mới**
+
+```
+mutation CreateCategory($input: CategoryCreateInput!) {
+  categoryCreate(input: $input) {
+    category {
+      categoryId
+      name
+      description
+      fullPath # "Giày thể thao > Giày chạy bộ"
+      parent {
+        categoryId
+        name
+      }
+
+      productCount # 0 ban đầu
+      thumbnailImage # null ban đầu
+      createdAt
+    }
+
+    errors {
+      message
+      field
+    }
+  }
+}
+
+# Variables:
+# {
+#   "input": {
+#     "name": "Giày chạy bộ",
+#     "description": "Giày dành riêng cho chạy bộ và marathon",
+#     "parentId": "1",              # ID của danh mục cha (nullable cho root)
+#     "isActive": true
+#   }
+# }
+```
+
+#### **2️⃣ Cập nhật danh mục**
+
+```graphql
+mutation UpdateCategory($id: ID!, $input: CategoryUpdateInput!) {
+  categoryUpdate(id: $id, input: $input) {
+    category {
+      categoryId
+      name
+      description
+      fullPath # Sẽ thay đổi nếu đổi parent
+      updatedAt
+
+      parent {
+        name
+      }
+
+      subcategories {
+        name # Các danh mục con vẫn giữ nguyên
+      }
+    }
+
+    errors {
+      message
+      field
+    }
+  }
+}
+
+# Variables:
+# {
+#   "id": "3",
+#   "input": {
+#     "name": "Giày chạy bộ cao cấp",
+#     "description": "Giày chạy bộ chuyên nghiệp và cao cấp",
+#     "parentId": "1",              # Có thể đổi parent
+#     "isActive": true
+#   }
+# }
+```
+
+#### **3️⃣ Xóa danh mục**
+
+```graphql
+mutation DeleteCategory($id: ID!) {
+  categoryDelete(id: $id) {
+    success # true/false
+    errors {
+      message
+      field
+    }
+  }
+}
+
+# Variables:
+# { "id": "5" }
+```
+
+#### **4️⃣ Di chuyển danh mục sang parent mới**
+
+```graphql
+mutation MoveCategoryToNewParent($id: ID!, $newParentId: ID) {
+  categoryUpdate(id: $id, input: { parentId: $newParentId }) {
+    category {
+      categoryId
+      name
+      fullPath # Đường dẫn sẽ thay đổi hoàn toàn
+      parent {
+        name
+      }
+
+      # Tất cả subcategories sẽ có fullPath mới
+      subcategories {
+        name
+        fullPath
+      }
+    }
+
+    errors {
+      message
+    }
+  }
+}
+
+# Variables:
+# {
+#   "id": "10",
+#   "newParentId": "3"              # Chuyển sang parent mới
+# }
+```
+
+---
+
+## 🛍️ **PRODUCT - SẢN PHẨM CHÍNH**
+
+### **📊 Cấu trúc ProductType**
+
+```graphql
+type ProductType {
+  # === THÔNG TIN CƠ BẢN ===
+  productId: ID! # Primary key: "1", "2", "3"
+  name: String! # "Nike Air Max 2024"
+  slug: String! # "nike-air-max-2024" (auto-generated)
+  description: String! # Mô tả HTML chi tiết
+  brand: String # "Nike", "Adidas"
+  modelCode: String! # "PRD-0001" (auto-generated)
+  isActive: Boolean! # Hoạt động
+  isFeatured: Boolean! # Nổi bật
+  createdAt: DateTime! # Ngày tạo
+  updatedAt: DateTime! # Ngày cập nhật
+  # === GIÁ CẢ (COMPUTED TỪ VARIANTS) ===
+  basePrice: Decimal! # Giá gốc
+  minPrice: Decimal # Giá thấp nhất từ variants
+  maxPrice: Decimal # Giá cao nhất từ variants
+  priceRange: String # "1,000,000đ - 2,000,000đ"
+  hasDiscount: Boolean # Có giảm giá không
+  discountPercentage: Float # % giảm giá cao nhất
+  # === THỐNG KÊ & TRẠNG THÁI ===
+  totalStock: Int! # Tổng tồn kho từ variants
+  variantCount: Int! # Số lượng variants
+  availabilityStatus: String! # "in_stock", "low_stock", "out_of_stock"
+  averageRating: Float # 4.5 (từ reviews)
+  reviewCount: Int # 128 reviews
+  totalSold: Int # Tổng số đã bán
+  # === QUAN HỆ ===
+  seller: UserType! # Người bán
+  category: CategoryType! # Danh mục
+  variants: ProductVariantConnection # Variants với pagination
+  galleryImages: [ProductImageType!]! # Ảnh gallery
+  thumbnailImage: ProductImageType # Ảnh đại diện
+  attributeOptions: [ProductAttributeOptionType!]! # Tùy chọn thuộc tính
+  # === NHÓM THUỘC TÍNH ===
+  colorOptions: [ProductAttributeOptionType!]! # Màu sắc
+  sizeOptions: [ProductAttributeOptionType!]! # Kích thước
+  materialOptions: [ProductAttributeOptionType!]! # Chất liệu
+}
+```
+
+### **🔍 PRODUCT QUERIES - TRUY VẤN SẢN PHẨM**
+
+#### **1️⃣ Lấy một sản phẩm chi tiết**
+
+```graphql
+query GetProductDetail($id: ID!) {
+  product(id: $id) {
+    # === THÔNG TIN CƠ BẢN ===
+    productId
+    name
+    slug # "nike-air-max-2024"
+    description
+    brand
+    modelCode # "PRD-0001"
+    # === GIÁ CẢ (computed từ variants) ===
+    basePrice
+    minPrice # Giá thấp nhất từ variants
+    maxPrice # Giá cao nhất từ variants
+    priceRange # "1,000,000đ - 2,000,000đ"
+    hasDiscount
+    discountPercentage # % giảm giá cao nhất
+    # === TRẠNG THÁI & THỐNG KÊ ===
+    isActive
+    isFeatured
+    totalStock # Tổng tồn kho từ variants
+    variantCount # Số lượng variants
+    availabilityStatus # "in_stock", "low_stock", "out_of_stock"
+    averageRating # 4.5
+    reviewCount # 128
+    totalSold # 456
+    # === THỜI GIAN ===
+    createdAt
+    updatedAt
+
+    # === QUAN HỆ ===
+    seller {
+      username
+      fullName
+      avatar
+    }
+
+    category {
+      categoryId
+      name
+      fullPath # "Thời trang > Giày dép > Giày thể thao"
+      parent {
+        name
+      }
+    }
+
+    # === IMAGES (Upload thật) ===
+    galleryImages {
+      imageId
+      imageUrl # http://localhost:8000/media/products/gallery/2025/10/image.jpg
+      isThumbnail
+      altText
+      displayOrder
+      createdAt
+    }
+
+    thumbnailImage {
+      imageUrl # Ảnh đại diện
+      altText
+    }
+
+    # === VARIANTS ===
+    variants {
+      edges {
+        node {
+          variantId
+          sku
+          price
+          stock
+          weight
+
+          # Thuộc tính từ JSON
+          colorName # Từ optionCombinations JSON
+          sizeName # Từ optionCombinations JSON
+          # Computed properties
+          isInStock # stock > 0 && is_active
+          stockStatus # "in_stock", "low_stock", "out_of_stock"
+          discountPercentage # So với basePrice
+          colorImageUrl # Từ attribute option image
+          isActive
+          createdAt
+        }
+      }
+    }
+
+    # === ATTRIBUTE OPTIONS ===
+    attributeOptions {
+      optionId
+      value # "39", "Black", "Da thật"
+      valueCode # "#000000", "XL"
+      imageUrl # Ảnh thuộc tính
+      displayOrder
+      isAvailable
+
+      attribute {
+        name # "Size", "Color", "Material"
+        type # "select", "color", "text", "number"
+        hasImage # true/false
+      }
+
+      variantCount # Số variants có option này
+      availableCombinations # JSON: các kết hợp còn lại
+    }
+
+    # === NHÓM THEO THUỘC TÍNH ===
+    colorOptions {
+      value # "Black", "White", "Red"
+      imageUrl
+      variantCount
+    }
+
+    sizeOptions {
+      value # "39", "40", "41"
+      variantCount
+    }
+
+    materialOptions {
+      value # "Leather", "Canvas", "Synthetic"
+      variantCount
+    }
+  }
+}
+
+# Variables:
+# { "id": "1" }
+```
+
+#### **2️⃣ Lấy danh sách sản phẩm với bộ lọc nâng cao**
+
+```graphql
+query GetProductsWithAdvancedFilter(
+  $first: Int
+  $after: String
+  $filter: ProductFilterInput
+  $sortBy: ProductSortingField
+) {
+  products(first: $first, after: $after, filter: $filter, sortBy: $sortBy) {
+    edges {
+      node {
+        productId
+        name
+        slug
+        brand
+        minPrice
+        maxPrice
+        totalStock
+        availabilityStatus
+        averageRating
+        reviewCount
+
+        thumbnailImage {
+          imageUrl
+        }
+
+        category {
+          name
+          fullPath
+        }
+
+        # Quick stats
+        variantCount
+
+        # Preview variants (top 3)
+        variants(first: 3, sortBy: PRICE_ASC) {
+          edges {
+            node {
+              sku
+              price
+              colorName
+              sizeName
+              isInStock
+            }
+          }
+        }
+      }
+    }
+
+    pageInfo {
+      hasNextPage
+      hasPreviousPage
+      startCursor
+      endCursor
+    }
+
+    totalCount
+  }
+}
+
+# Variables:
+# {
+#   "first": 20,
+#   "after": null,
+#   "filter": {
+#     "search": "giày Nike",
+#     "brand": "Nike",
+#     "categoryId": "1",
+#     "priceMin": 1000000,
+#     "priceMax": 3000000,
+#     "hasStock": true,
+#     "isActive": true,
+#     "isFeatured": null
+#   },
+#   "sortBy": "PRICE_ASC"
+# }
+```
+
+#### **3️⃣ Sản phẩm nổi bật và mới**
+
+```graphql
+query GetSpecialProducts {
+  # Sản phẩm nổi bật
+  featuredProducts(first: 10) {
+    edges {
+      node {
+        productId
+        name
+        brand
+        minPrice
+        averageRating
+
+        thumbnailImage {
+          imageUrl
+        }
+
+        category {
+          name
+        }
+
+        # Stats
+        totalStock
+        variantCount
+        totalSold
+      }
+    }
+  }
+
+  # Sản phẩm mới nhất
+  products(filter: { isActive: true }, sortBy: "created_at_desc", first: 10) {
+    edges {
+      node {
+        productId
+        name
+        brand
+        createdAt
+        minPrice
+
+        thumbnailImage {
+          imageUrl
+        }
+
+        # Badge "Mới"
+        daysSinceCreated # Helper field
+      }
+    }
+  }
+}
+```
+
+#### **4️⃣ Sản phẩm theo danh mục**
+
+```graphql
+query GetProductsByCategory(
+  $categoryId: ID!
+  $first: Int
+  $filter: ProductFilterInput
+) {
+  productsByCategory(
+    categoryId: $categoryId
+    first: $first
+    filter: $filter
+    sortBy: "price_asc"
+  ) {
+    edges {
+      node {
+        productId
+        name
+        brand
+        minPrice
+        maxPrice
+        totalStock
+        availabilityStatus
+
+        thumbnailImage {
+          imageUrl
+        }
+
+        # Category info (sẽ giống nhau vì cùng category)
+        category {
+          name
+          fullPath
+        }
+
+        # Quick variant info
+        colorOptions {
+          value
+          imageUrl
+          variantCount
+        }
+
+        sizeOptions {
+          value
+          variantCount
+        }
+      }
+    }
+
+    totalCount
+  }
+}
+
+# Variables:
+# {
+#   "categoryId": "1",
+#   "first": 20,
+#   "filter": {
+#     "hasStock": true,
+#     "isActive": true
+#   }
+# }
+```
+
+#### **5️⃣ Tìm kiếm sản phẩm thông minh**
+
+```graphql
+query SmartSearchProducts($query: String!, $first: Int) {
+  searchProducts(
+    query: $query # "nike air max black 39"
+    filter: { isActive: true, hasStock: true }
+    first: $first
+  ) {
+    edges {
+      node {
+        productId
+        name
+        brand
+        minPrice
+
+        # Search metadata
+        searchScore # 0.95 (độ khớp với query)
+        matchedFields # ["name", "brand"]
+        highlightedName # "Nike <em>Air Max</em> 2024"
+        highlightedDescription
+
+        thumbnailImage {
+          imageUrl
+        }
+
+        # Matching variants
+        variants(
+          filter: {
+            colorName: "Black" # Nếu query có màu
+            sizeName: "39" # Nếu query có size
+            isActive: true
+          }
+        ) {
+          edges {
+            node {
+              sku
+              price
+              colorName
+              sizeName
+              isInStock
+            }
+          }
+        }
+      }
+    }
+
+    # Search suggestions
+    suggestions {
+      query # "Did you mean: nike air max?"
+      type # "spelling", "completion"
+      score
+    }
+
+    # Related searches
+    relatedQueries # ["nike air force", "adidas ultraboost"]
+  }
+}
+
+# Variables:
+# {
+#   "query": "nike air max black 39",
+#   "first": 20
+# }
+```
+
+### **🔧 PRODUCT MUTATIONS - THAY ĐỔI SẢN PHẨM**
+
+#### **1️⃣ Tạo sản phẩm mới**
+
+```graphql
+mutation CreateProduct($input: ProductCreateInput!) {
+  productCreate(input: $input) {
+    product {
+      productId
+      name
+      slug # auto: "nike-air-max-2024"
+      modelCode # auto: "PRD-0001", "PRD-0002", ...
+      basePrice
+      brand
+
+      category {
+        name
+        fullPath
+      }
+
+      # Initial state
+      minPrice # null ban đầu (chưa có variants)
+      maxPrice # null ban đầu
+      totalStock # 0 ban đầu
+      variantCount # 0 ban đầu
+      createdAt
+    }
+
+    errors {
+      message
+      field
+    }
+  }
+}
+
+# Variables:
+# {
+#   "input": {
+#     "name": "Nike Air Max 2024",
+#     "description": "Giày thể thao cao cấp với công nghệ Air Max mới nhất từ Nike",
+#     "categoryId": "1",
+#     "basePrice": "2500000",
+#     "brand": "Nike",
+#     "isActive": true,
+#     "isFeatured": false
+#   }
+# }
+```
+
+#### **2️⃣ Cập nhật sản phẩm**
+
+```graphql
+mutation UpdateProduct($id: ID!, $input: ProductUpdateInput!) {
+  productUpdate(id: $id, input: $input) {
+    product {
+      productId
+      name
+      basePrice
+      isFeatured
+      description
+      updatedAt
+
+      # Slug tự động cập nhật nếu đổi tên
+      slug # "nike-air-max-2024-premium-edition"
+      category {
+        name
+        fullPath
+      }
+    }
+
+    errors {
+      message
+      field
+    }
+  }
+}
+
+# Variables:
+# {
+#   "id": "1",
+#   "input": {
+#     "name": "Nike Air Max 2024 Premium Edition",
+#     "basePrice": "2700000",
+#     "isFeatured": true,
+#     "description": "Phiên bản cao cấp với chất liệu da thật và công nghệ mới nhất",
+#     "categoryId": "2"              # Có thể đổi category
+#   }
+# }
+```
+
+# Variant đơn lẻ
+
+productVariant(id: ID!) {
+variantId
+sku
+price
+stock
+weight
+optionCombinations # JSON
+colorName # từ optionCombinations
+sizeName # từ optionCombinations
+isInStock # computed
+colorImageUrl # từ color option
+isActive
+
+    product { name }
+
+}
+
+#### **3️⃣ Xóa sản phẩm**
+
+```graphql
+mutation DeleteProduct($id: ID!) {
+  productDelete(id: $id) {
+    success # true/false
+    errors {
+      message
+      field
+    }
+  }
+}
+
+# Variables:
+# { "id": "1" }
+```
+
+#### **4️⃣ Tạo hàng loạt sản phẩm**
+
+```graphql
+mutation BulkCreateProducts($products: [ProductCreateInput!]!) {
+  bulkProductCreate(products: $products) {
+    products {
+      productId
+      name
+      slug # Tự động tạo cho mỗi sản phẩm
+      modelCode # PRD-0002, PRD-0003, PRD-0004
+      brand
+      basePrice
+
+      category {
+        name
+      }
+    }
+
+    successCount # Số sản phẩm tạo thành công
+    errors {
+      message
+      productIndex # Sản phẩm thứ mấy bị lỗi
+    }
+  }
+}
+
+# Variables:
+# {
+#   "products": [
+#     {
+#       "name": "Adidas Ultraboost 2024",
+#       "categoryId": "1",
+#       "basePrice": "3200000",
+#       "brand": "Adidas",
+#       "description": "Giày chạy bộ cao cấp từ Adidas"
+#     },
+#     {
+#       "name": "Puma RS-X Future",
+#       "categoryId": "1",
+#       "basePrice": "2800000",
+#       "brand": "Puma",
+#       "description": "Giày thể thao retro-futuristic"
+#     }
+#   ]
+# }
+```
+
+---
+
+## 🎨 **PRODUCT VARIANT - BIẾN THỂ**
+
+### **📊 Cấu trúc ProductVariantType**
+
+```graphql
+type ProductVariantType {
+  # === THÔNG TIN CƠ BẢN ===
+  variantId: ID! # Primary key: "1", "2", "3"
+  sku: String! # "NIKE-AIR-MAX-39-BLACK"
+  price: Decimal! # Giá cụ thể của variant
+  stock: Int! # Tồn kho
+  weight: Decimal! # Trọng lượng (kg)
+  isActive: Boolean! # Hoạt động
+  createdAt: DateTime! # Ngày tạo
+  updatedAt: DateTime! # Ngày cập nhật
+  # === THUỘC TÍNH (Parsed từ JSON) ===
+  optionCombinations: JSONString! # {"Size": "39", "Color": "Black"}
+  colorName: String # "Black" - parsed từ JSON
+  sizeName: String # "39" - parsed từ JSON
+  materialName: String # "Leather" - parsed từ JSON
+  # === COMPUTED FIELDS ===
+  isInStock: Boolean! # stock > 0 && is_active
+  stockStatus: String! # "in_stock", "low_stock", "out_of_stock"
+  discountPercentage: Float # % giảm giá so với basePrice
+  colorImageUrl: String # URL ảnh màu từ attribute option
+  # === QUAN HỆ ===
+  product: ProductType! # Sản phẩm cha
+  colorImage: ProductAttributeOptionType # Ảnh màu tương ứng
+}
+```
+
+### **🔍 VARIANT QUERIES - TRUY VẤN BIẾN THỂ**
+
+#### **1️⃣ Lấy variants của một sản phẩm**
+
+```graphql
+query GetProductVariants($productId: ID!, $filter: ProductVariantFilterInput) {
+  productVariants(
+    filter: {
+      productId: $productId
+      isActive: true
+      ...filter
+    }
+    sortBy: PRICE_ASC
+  ) {
+    edges {
+      node {
+        variantId
+        sku
+        price
+        stock
+        weight
+
+        # Thuộc tính từ JSON
+        colorName
+        sizeName
+        materialName
+        colorImageUrl
+
+        # Trạng thái
+        isInStock
+        stockStatus
+        discountPercentage
+
+        # Sản phẩm cha
+        product {
+          name
+          brand
+          basePrice
+        }
+      }
+    }
+  }
+}
+
+# Variables:
+# {
+#   "productId": "1",
+#   "filter": {
+#     "hasStock": true,
+#     "priceMin": 2000000,
+#     "priceMax": 3000000
+#   }
+# }
+```
+
+### **🔧 VARIANT MUTATIONS - THAY ĐỔI BIẾN THỂ**
+
+#### **1️⃣ Tạo variant mới**
+
+```graphql
+mutation CreateVariant($input: ProductVariantCreateInput!) {
+  productVariantCreate(input: $input) {
+    productVariant {
+      variantId
+      sku
+      price
+      stock
+      colorName # "Black" - parsed từ JSON
+      sizeName # "39" - parsed từ JSON
+      isInStock # true vì stock > 0
+      stockStatus # "in_stock"
+      product {
+        name
+        # Các computed fields sẽ tự động cập nhật
+        minPrice # Cập nhật nếu đây là giá thấp nhất
+        maxPrice # Cập nhật nếu đây là giá cao nhất
+        totalStock # Tăng thêm stock của variant này
+      }
+    }
+
+    errors {
+      message
+      field
+    }
+  }
+}
+
+# Variables:
+# {
+#   "input": {
+#     "productId": "1",
+#     "sku": "NIKE-AIR-MAX-2024-39-BLACK",
+#     "price": "2650000",
+#     "stock": 50,
+#     "weight": "0.8",
+#     "optionCombinations": "{\"Size\": \"39\", \"Color\": \"Black\"}",
+#     "isActive": true
+#   }
+# }
+```
+
+#### **2️⃣ Cập nhật stock & price**
+
+```graphql
+mutation UpdateStock($variantId: ID!, $stock: Int!) {
+  stockUpdate(variantId: $variantId, stock: $stock) {
+    productVariant {
+      sku
+      stock
+      isInStock # Có thể thay đổi từ true → false
+      stockStatus # "low_stock" nếu <= 5
+      product {
+        totalStock # Tự động cập nhật
+        availabilityStatus # Có thể thay đổi
+      }
+    }
+
+    errors {
+      message
+    }
+  }
+}
+
+# Variables:
+# {
+#   "variantId": "1",
+#   "stock": 25
+# }
+```
+
+```graphql
+mutation UpdatePrice($variantId: ID!, $price: Decimal!) {
+  priceUpdate(variantId: $variantId, price: $price) {
+    productVariant {
+      sku
+      price
+      discountPercentage # So với basePrice
+      product {
+        minPrice # Có thể thay đổi
+        maxPrice # Có thể thay đổi
+        priceRange # Tự động cập nhật
+      }
+    }
+
+    errors {
+      message
+    }
+  }
+}
+
+# Variables:
+# {
+#   "variantId": "1",
+#   "price": "2800000"
+# }
+```
+
+#### **3️⃣ Bulk operations cho variants**
+
+```graphql
+mutation BulkUpdateStock($updates: [StockUpdateInput!]!) {
+  bulkStockUpdate(updates: $updates) {
+    results {
+      productVariant {
+        sku
+        stock
+        stockStatus
+        isInStock
+      }
+      success
+      errors {
+        message
+      }
+    }
+
+    successCount # Số lượng update thành công
+    failedCount # Số lượng failed
+  }
+}
+
+# Variables:
+# {
+#   "updates": [
+#     { "variantId": "1", "stock": 20 },
+#     { "variantId": "2", "stock": 35 },
+#     { "variantId": "3", "stock": 0 }     # Out of stock
+#   ]
+# }
+```
+
+---
+
+## 🖼️ **IMAGE SYSTEM - HỆ THỐNG ẢNH**
+
+### **📊 Cấu trúc ProductImageType**
+
+```graphql
+type ProductImageType {
+  imageId: ID! # Primary key
+  imageUrl: String! # http://localhost:8000/media/products/gallery/2025/10/image.jpg
+  isThumbnail: Boolean! # Chỉ 1 ảnh thumbnail/product
+  altText: String # SEO alt text
+  displayOrder: Int! # Thứ tự hiển thị
+  createdAt: DateTime! # Ngày upload
+  product: ProductType! # Sản phẩm chủ sở hữu
+}
+```
+
+### **📤 IMAGE MUTATIONS - UPLOAD & QUẢN LÝ ẢNH**
+
+#### **1️⃣ Upload ảnh sản phẩm**
+
+```graphql
+# Chú ý: Cần sử dụng multipart form data
+mutation UploadProductImage(
+  $productId: ID!
+  $image: Upload!
+  $isThumbnail: Boolean
+) {
+  uploadProductImage(
+    productId: $productId
+    image: $image # File upload thực tế
+    isThumbnail: $isThumbnail # Chỉ 1 ảnh thumbnail/product
+    altText: "Ảnh Nike Air Max 2024"
+    displayOrder: 0
+  ) {
+    productImage {
+      imageId
+      imageUrl # http://localhost:8000/media/products/gallery/2025/10/nike_air_max.jpg
+      isThumbnail
+      altText
+      displayOrder
+      createdAt
+
+      product {
+        name
+        # Nếu là thumbnail, product.thumbnailImage sẽ cập nhật
+      }
+    }
+
+    errors {
+      message
+    }
+  }
+}
+
+# Variables (trong GraphQL Playground):
+# {
+#   "productId": "1",
+#   "isThumbnail": true
+# }
+# File: Chọn file ảnh trong GraphQL Playground
+```
+
+#### **2️⃣ Upload ảnh cho attribute option (màu sắc)**
+
+```graphql
+mutation UploadAttributeOptionImage($optionId: ID!, $image: Upload!) {
+  uploadAttributeOptionImage(optionId: $optionId, image: $image) {
+    attributeOption {
+      optionId
+      value # "Black"
+      valueCode # "#000000"
+      imageUrl # http://localhost:8000/media/products/attributes/2025/10/black_color.jpg
+      attribute {
+        name # "Color"
+        type # "color"
+        hasImage # true
+      }
+
+      # Variants sử dụng option này sẽ có colorImageUrl
+      variantCount
+    }
+
+    errors {
+      message
+    }
+  }
+}
+
+# Variables:
+# {
+#   "optionId": "5"                 # ID của color option "Black"
+# }
+# File: Chọn file ảnh màu đen
+```
+
+#### **3️⃣ Xóa ảnh**
+
+```graphql
+mutation DeleteProductImage($imageId: ID!) {
+  deleteProductImage(imageId: $imageId) {
+    success # File sẽ tự động xóa khỏi storage
+    errors {
+      message
+    }
+  }
+}
+
+# Variables:
+# { "imageId": "img_123" }
+```
+
+#### **4️⃣ Cập nhật thứ tự ảnh**
+
+```graphql
+mutation ReorderProductImages(
+  $productId: ID!
+  $imageOrders: [ImageOrderInput!]!
+) {
+  reorderProductImages(productId: $productId, imageOrders: $imageOrders) {
+    productImages {
+      imageId
+      imageUrl
+      displayOrder # Thứ tự mới
+      isThumbnail
+    }
+
+    errors {
+      message
+    }
+  }
+}
+
+# Variables:
+# {
+#   "productId": "1",
+#   "imageOrders": [
+#     { "imageId": "img_1", "displayOrder": 0 },
+#     { "imageId": "img_2", "displayOrder": 1 },
+#     { "imageId": "img_3", "displayOrder": 2 }
+#   ]
+# }
+```
+
+---
+
+## 🔍 **ADVANCED FEATURES - TÍNH NĂNG NÂNG CAO**
+
+### **🎯 Filtering System - Hệ thống lọc**
+
+```graphql
+# === INPUT TYPES CHO FILTERING ===
+input ProductFilterInput {
+  # 🔤 Text Search
+  search: String # Tìm trong name, description, brand
+  name: String # Exact match tên
+  nameIcontains: String # Contains (case-insensitive)
+  brand: String # Exact brand
+  brandIn: [String!] # Multi-brand: ["Nike", "Adidas"]
+  modelCode: String # Exact model code
+  # 🏷️ Category & Seller
+  categoryId: ID # Thuộc danh mục cụ thể
+  categoryIdIn: [ID!] # Multi-category
+  includeSubcategories: Boolean # Bao gồm danh mục con
+  sellerId: ID # Của seller cụ thể
+  sellerIdIn: [ID!] # Multi-seller
+  # 💰 Price Filtering
+  priceMin: Decimal # Giá tối thiểu (từ variants)
+  priceMax: Decimal # Giá tối đa (từ variants)
+  basePriceMin: Decimal # Base price tối thiểu
+  basePriceMax: Decimal # Base price tối đa
+  hasDiscount: Boolean # Có giảm giá
+  discountMin: Float # % giảm giá tối thiểu
+  # 📦 Stock & Availability
+  hasStock: Boolean # Có tồn kho (từ variants)
+  stockMin: Int # Tồn kho tối thiểu
+  stockMax: Int # Tồn kho tối đa
+  hasVariants: Boolean # Có variants
+  hasImages: Boolean # Có ảnh
+  # 🏃 Status Filtering
+  isActive: Boolean # Sản phẩm đang hoạt động
+  isFeatured: Boolean # Sản phẩm nổi bật
+  availabilityStatus: String # "in_stock", "low_stock", "out_of_stock"
+  # 🎨 Attribute Filtering
+  attributes: [AttributeFilterInput!] # Lọc theo thuộc tính
+  colorName: String # Có variant màu này
+  colorNameIn: [String!] # Multi-color
+  sizeName: String # Có variant size này
+  sizeNameIn: [String!] # Multi-size
+  # 📅 Date Filtering
+  createdAfter: DateTime # Tạo sau ngày
+  createdBefore: DateTime # Tạo trước ngày
+  updatedAfter: DateTime # Cập nhật sau ngày
+  updatedBefore: DateTime # Cập nhật trước ngày
+  # ⭐ Rating & Reviews
+  ratingMin: Float # Rating tối thiểu
+  ratingMax: Float # Rating tối đa
+  hasReviews: Boolean # Có reviews
+  reviewCountMin: Int # Số review tối thiểu
+}
+
+input AttributeFilterInput {
+  name: String! # "Color", "Size", "Material"
+  values: [String!]! # ["Black", "White", "Red"]
+  operator: AttributeOperator # AND, OR (default: OR)
+}
+
+enum AttributeOperator {
+  AND # Phải có tất cả values
+  OR # Có ít nhất 1 value
+}
+
+# === SORTING OPTIONS ===
+enum ProductSortingField {
+  NAME # A-Z
+  NAME_DESC # Z-A
+  PRICE # Giá thấp → cao (từ minPrice)
+  PRICE_DESC # Giá cao → thấp (từ maxPrice)
+  CREATED_AT # Cũ → mới
+  CREATED_AT_DESC # Mới → cũ (default)
+  UPDATED_AT # Ít update → nhiều update
+  UPDATED_AT_DESC # Nhiều update → ít update
+  STOCK # Ít hàng → nhiều hàng
+  STOCK_DESC # Nhiều hàng → ít hàng
+  RATING # Rating thấp → cao
+  RATING_DESC # Rating cao → thấp
+  SALES # Bán ít → bán nhiều
+  SALES_DESC # Bán nhiều → bán ít
+  FEATURED # Non-featured → featured
+  FEATURED_DESC # Featured → non-featured
+}
+```
+
+### **📊 Analytics & Statistics - Thống kê**
+
+```graphql
+query GetProductAnalytics {
+  productStats {
+    # === TỔNG QUAN ===
+    totalProducts # 1,234
+    totalVariants # 5,678
+    totalCategories # 45
+    activeProducts # 1,100
+    featuredProducts # 56
+    # === GIÁ CẢ ===
+    averagePrice # 2,500,000
+    totalValue # Tổng giá trị kho
+    priceRanges {
+      range # "1-2 triệu"
+      min
+      max
+      count # Số sản phẩm trong khoảng
+    }
+
+    # === TỒN KHO ===
+    totalStock # 12,345
+    averageStock # 25
+    lowStockProducts # 23 (stock <= 5)
+    outOfStockProducts # 12
+    # === TOP PERFORMERS ===
+    topSellingProducts(limit: 10) {
+      product {
+        name
+        brand
+        minPrice
+      }
+      soldCount
+      revenue
+    }
+
+    topRatedProducts(limit: 10) {
+      product {
+        name
+        brand
+      }
+      averageRating
+      reviewCount
+    }
+
+    # === ALERTS ===
+    stockAlerts {
+      product {
+        name
+      }
+      variant {
+        sku
+      }
+      currentStock
+      alertLevel # "low", "critical", "out"
+    }
+
+    # === CATEGORY BREAKDOWN ===
+    categoryStats {
+      category {
+        name
+        fullPath
+      }
+      productCount
+      totalStock
+      averagePrice
+      totalValue
+    }
+
+    # === BRAND BREAKDOWN ===
+    brandStats {
+      brandName
+      productCount
+      averagePrice
+      totalValue
+    }
+  }
+}
+```
+
+### **🚀 Real-time Subscriptions - Theo dõi thời gian thực**
+
+```graphql
+# === THEO DÕI THAY ĐỔI STOCK ===
+subscription ProductStockUpdates($productIds: [ID!]) {
+  stockUpdates(productIds: $productIds) {
+    variant {
+      variantId
+      sku
+      stock
+      stockStatus
+      isInStock
+
+      product {
+        name
+        totalStock
+        availabilityStatus
+      }
+    }
+
+    changeType # "STOCK_UPDATE", "LOW_STOCK", "OUT_OF_STOCK", "BACK_IN_STOCK"
+    previousStock
+    newStock
+    timestamp
+  }
+}
+
+# === THEO DÕI THAY ĐỔI GIÁ ===
+subscription ProductPriceUpdates($productIds: [ID!]) {
+  priceUpdates(productIds: $productIds) {
+    product {
+      productId
+      name
+      minPrice
+      maxPrice
+      priceRange
+    }
+
+    variant {
+      variantId
+      sku
+      price
+    }
+
+    changeType # "PRICE_INCREASE", "PRICE_DECREASE", "DISCOUNT_APPLIED"
+    previousPrice
+    newPrice
+    changePercentage # +15% or -20%
+    timestamp
+  }
+}
+
+# === THEO DÕI SẢN PHẨM MỚI ===
+subscription NewProducts($categoryId: ID, $sellerId: ID) {
+  newProducts(categoryId: $categoryId, sellerId: $sellerId) {
+    product {
+      productId
+      name
+      brand
+      minPrice
+
+      thumbnailImage {
+        imageUrl
+      }
+
+      category {
+        name
+      }
+
+      seller {
+        username
+      }
+    }
+
+    timestamp
+  }
+}
+```
+
+---
+
+## 🔧 **SETUP & INTEGRATION**
+
+### **✅ Tích hợp hoàn tất**
+
+#### **1. GraphQL Schema đã sẵn sàng**
+
+```python
+# graphql/api.py - ✅ ĐÃ SETUP
+import graphene
+from .product.schema import ProductQueries, ProductMutations
+
+class Query(ProductQueries, graphene.ObjectType):
+    health = graphene.String()
+    def resolve_health(self, info):
+        return "SHOEX GraphQL API is running!"
+
+class Mutation(ProductMutations, graphene.ObjectType):
+    pass
+
+schema = graphene.Schema(query=Query, mutation=Mutation)
+```
+
+#### **2. Django Settings đã cấu hình**
+
+```python
+# config/settings.py - ✅ ĐÃ SETUP
+INSTALLED_APPS = [
+    'graphene_django',              # GraphQL core
+    'graphene_file_upload',         # Image upload support
+    'products',                     # Product models
+    # ...
+]
+
+GRAPHENE = {
+    "SCHEMA": "graphql.api.schema",
+    'MIDDLEWARE': [
+        'graphene_file_upload.django.FileUploadGraphQLMiddleware',
+    ],
+}
+
+# Media files - ✅ ĐÃ SETUP
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+```
+
+#### **3. URLs đã cấu hình**
+
+```python
+# config/urls.py - ✅ ĐÃ SETUP
+from graphene_django.views import GraphQLView
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('graphql/', GraphQLView.as_view(graphiql=True, schema=schema)),
+]
+
+# Media serving - ✅ ĐÃ SETUP
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+```
+
+#### **4. Database đã migrate**
+
+```bash
+# ✅ ĐÃ CHẠY
+python manage.py makemigrations products
+python manage.py migrate products
+```
+
+#### **5. Server sẵn sàng**
+
+```bash
+# ✅ ĐANG CHẠY
+python manage.py runserver
+# GraphQL Playground: http://127.0.0.1:8000/graphql/
+```
+
+---
+
+## 📊 **PERFORMANCE & SECURITY**
+
+### **⚡ Performance Optimization**
+
+- **DataLoader**: Batch loading cho N+1 queries
+- **Database Indexing**: Index trên `slug`, `brand`, `sku`, `category_id`
+- **Query Complexity**: Giới hạn depth và field selections
+- **Caching Strategy**: Redis cache cho product lists, categories
+- **Image Optimization**: Auto resize, WebP conversion
+- **Search Performance**: PostgreSQL full-text search
+
+### **🔒 Security Measures**
+
+- **Authentication**: JWT-based với refresh tokens
+- **Authorization**: Permission-based field access
+- **Rate Limiting**: GraphQL query complexity scoring
+- **Input Validation**: Sanitize uploads và text inputs
+- **CORS Configuration**: Strict origin policies
+
+### **📈 Monitoring & Analytics**
+
+- **Query Performance**: Slow query detection
+- **Error Tracking**: Comprehensive error logging
+- **Business Metrics**: Sales, inventory, user behavior
+- **Real-time Alerts**: Stock levels, performance issues
+
+---
+
+## 🎯 **BEST PRACTICES - THỰC HÀNH TỐT NHẤT**
+
+1. **🎨 Variant Strategy**: Luôn tạo variants cho sản phẩm có tùy chọn
+2. **📋 Attribute Planning**: Thiết kế attributes trước khi tạo products
+3. **🖼️ Image Optimization**: Tối ưu ảnh và sử dụng CDN
+4. **🔍 Search Optimization**: Full-text search cho performance
+5. **📦 Stock Management**: Cập nhật stock real-time
+6. **🏗️ Category Structure**: Cây danh mục hợp lý, không quá sâu
+7. **🔄 Bulk Operations**: Sử dụng bulk mutations cho admin tasks
+8. **📊 Analytics**: Monitor performance và business metrics
+
+---
+
+## 🔗 **MODULE LIÊN QUAN**
+
+- **👤 User Module**: Seller management, product ownership
+- **🛒 Cart Module**: Product variants trong giỏ hàng
+- **📦 Order Module**: Product fulfillment, inventory tracking
+- **⭐ Review Module**: Product ratings, reviews
+- **🎫 Discount Module**: Product promotions, coupons
+- **🚚 Shipping Module**: Product weight, dimensions
+- **🔔 Notification Module**: Stock alerts, price changes
+
+---
+
+**🚀 SHOEX GraphQL Product API - Production Ready!**
+_Hệ thống Product & Variant phức tạp với Image Upload thực tế_
+_Theo kiến trúc Django + Graphene hiện đại_ ✅
+
+```
 
 # === QUERIES DANH SÁCH với Relay Pagination ===
 query {
