@@ -1,4 +1,5 @@
+Tạo csdl tên: "shoex"
+Vào pgAdmin4 Chuột phải vào csdl "shoex" chọn restore .
+Ở Chỡ Filename nhấn vô biểu tượng thư mục . Sau đó trỏ đến thư mục CSDL , trong thư mục ở chỗ select ở góc phải dưới chọn SQL File.sql thì sẽ hiện ra file data .Click vào là oke
 Chạy file từ terminal........BackEnd : manage.py runserver
 
-python manage.py makemigrations
-python manage.py migrate
