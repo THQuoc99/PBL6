@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
@@ -15,7 +16,7 @@
 </head>
 <body>
   <div class="chat-box">
-    <h3>💬 Chat với GPT</h3>
+    <h3>💬 Chat bot</h3>
     <div id="chat" class="messages"></div>
     <input id="message" type="text" placeholder="Nhập tin nhắn..." />
     <button onclick="sendMessage()">Gửi</button>
@@ -23,28 +24,42 @@
 
   <script>
     async function sendMessage() {
-      const msg = document.getElementById("message").value;
+      const msg = document.getElementById("message").value.trim();
       if (!msg) return;
 
       const chat = document.getElementById("chat");
       chat.innerHTML += `<div class="user"><b>Bạn:</b> ${msg}</div>`;
       document.getElementById("message").value = "";
 
-      const response = await fetch("/chatbot/chat/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: msg })
-      });
-
-      const data = await response.json();
-      if (data.reply) {
-        chat.innerHTML += `<div class="bot"><b>GPT:</b> ${data.reply}</div>`;
-      } else {
-        chat.innerHTML += `<div class="bot"><b>Lỗi:</b> ${data.error}</div>`;
-      }
-
+      // Hiển thị trạng thái đang soạn
+      chat.innerHTML += `<div id="loading" class="bot"><i></i></div>`;
       chat.scrollTop = chat.scrollHeight;
+
+      try {
+        const response = await fetch("/chatbot/chat/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: msg })
+        });
+
+        const data = await response.json();
+        document.getElementById("loading")?.remove();
+
+        if (data.response) {
+          chat.innerHTML += `<div class="bot"><b>Chatbot:</b> ${data.response}</div>`;
+        } else if (data.error) {
+          chat.innerHTML += `<div class="bot"><b>Lỗi:</b> ${data.error}</div>`;
+        } else {
+          chat.innerHTML += `<div class="bot"><b>Lỗi:</b> Không có phản hồi từ server</div>`;
+        }
+
+        chat.scrollTop = chat.scrollHeight;
+      } catch (err) {
+        document.getElementById("loading")?.remove();
+        chat.innerHTML += `<div class="bot"><b>Lỗi:</b> ${err.message}</div>`;
+      }
     }
   </script>
+
 </body>
 </html>

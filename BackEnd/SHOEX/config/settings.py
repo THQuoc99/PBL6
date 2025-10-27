@@ -53,6 +53,8 @@ INSTALLED_APPS = [
     "reviews",
     "discount",
     "address",
+    'rest_framework',
+    'rest_framework_simplejwt',
 ]
 
 MIDDLEWARE = [
@@ -87,6 +89,14 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # Thêm các class xác thực khác nếu cần
+    ),
+    # ...
+}
+
 # GraphQL Configuration
 GRAPHENE = {
     "SCHEMA": "graphql_api.api.schema",  # Đường dẫn đến schema
@@ -100,11 +110,14 @@ import dj_database_url
 import os
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default="postgresql://shoexdata_user:9iJnTZrmoK5e2BmONYOO8kStol4xgeRe@dpg-d35s6dali9vc738mdev0-a.oregon-postgres.render.com/shoexdata",
-        conn_max_age=600,
-        ssl_require=True
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'shoex',        # tên database bạn tạo local (vd: shoexdata)
+        'USER': 'postgres',         # user mặc định PostgreSQL local
+        'PASSWORD': 'postgres',# thay bằng mật khẩu bạn đặt khi cài PostgreSQL
+        'HOST': 'localhost',        # local database
+        'PORT': '5432',             # cổng mặc định PostgreSQL
+    }
 }
 
 
@@ -150,4 +163,4 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 import os
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "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")
+OPENROUTER_API_KEY = "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"
