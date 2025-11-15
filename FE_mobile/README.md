@@ -112,9 +112,11 @@ flutter logs
 - Dùng VS Code + extension Flutter để debug với hot reload (phím `r` trong terminal khi `flutter run` đang chạy, hoặc nhấn nút Hot Reload trong IDE).
 - Dùng `flutter pub outdated` để kiểm tra package cần nâng cấp.
 
-Nếu bạn muốn, tôi có thể:
-- Thêm hướng dẫn cấu hình `local.properties` tự động cho Windows.
-- Tạo script .ps1 để tự động cài dependency, build nhanh.
+**Bổ sung assets để test local**
+
+https://drive.google.com/file/d/1_qJABY9a_ip8LYFt3uHn2F2kjQ1ODjyD/view?usp=sharing
+
+vào link tải file về và giải nén sau đó thay thế folder assets trong project
 
 ---
 
