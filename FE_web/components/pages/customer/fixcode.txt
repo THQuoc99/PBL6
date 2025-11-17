@@ -1,0 +1,5 @@
+file ProductDetailPage : hiện tại khi chuyển đến trang thì nó bị trôi xuống theo vị trí của lúc nhấn sản phẩm ở trang trước, sửa lại cho tôi nó sẽ di chuyển lên trên cùng ,
+Thêm cho tôi trang xử lí thanh toán luôn.
+AccountPage : thêm cho tôi tín nắng upload ảnh avt tại button của camera.
++)Phần địa chỉ thì hiển thị danh sách địa chỉ và có thể đặt địa chỉ mặc định và sửa chữa mỗi địa chỉ. 
+CartPage : thêm checkbox để xử lí chọn sản phẩm trong đơn hàng , khi chọn sản phẩm nào nó sẽ nhảy sang Tóm tắt đơn hàng (Dạng tóm tắt )
