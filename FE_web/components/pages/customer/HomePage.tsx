@@ -4,7 +4,7 @@ import { Star, Heart, ShoppingCart, ArrowRight, Truck, Shield, Headphones, Rotat
 
 interface CustomerHomePageProps {
   onNavigateToSeller?: () => void;
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: string, data?: any) => void;
 }
 
 export default function CustomerHomePage({ onNavigateToSeller, onNavigate }: CustomerHomePageProps) {

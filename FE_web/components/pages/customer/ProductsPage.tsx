@@ -4,7 +4,7 @@ import { Filter, Grid, List, Star, Heart, ShoppingCart, ChevronDown } from 'luci
 
 interface CustomerProductsPageProps {
   onNavigateToSeller?: () => void;
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: string, data?: any) => void;
 }
 
 export default function CustomerProductsPage({ onNavigateToSeller, onNavigate }: CustomerProductsPageProps) {
@@ -370,7 +370,7 @@ export default function CustomerProductsPage({ onNavigateToSeller, onNavigate }:
                   className={`bg-white rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300 overflow-hidden cursor-pointer group ${
                     viewMode === 'list' ? 'flex' : ''
                   }`}
-                  onClick={() => onNavigate?.('product-detail')}
+                  onClick={() => onNavigate?.('product-detail', { productId: product.id })}
                 >
                   <div className={`relative ${viewMode === 'list' ? 'w-64 flex-shrink-0' : 'aspect-square'}`}>
                     <img 

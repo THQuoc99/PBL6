@@ -3,7 +3,7 @@ import CustomerLayout from '../../layout/CustomerLayout';
 import { ShoppingCart, Trash2, Plus, Minus, Gift, Truck, Shield, ArrowRight, Check } from 'lucide-react';
 
 interface CartPageProps {
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: string, data?: any) => void;
 }
 
 interface CartItem {
@@ -186,14 +186,22 @@ export default function CartPage({ onNavigate }: CartPageProps) {
                       </div>
 
                       {/* Product Image */}
-                      <div className="w-24 h-24 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <div 
+                        className="w-24 h-24 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-gray-300 transition-colors"
+                        onClick={() => onNavigate?.('product-detail', { productId: item.id })}
+                      >
                         <span className="text-gray-500 text-xs">Image</span>
                       </div>
 
                       {/* Product Info */}
                       <div className="flex-1">
                         <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-bold text-lg text-gray-900">{item.name}</h3>
+                          <h3 
+                            className="font-bold text-lg text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+                            onClick={() => onNavigate?.('product-detail', { productId: item.id })}
+                          >
+                            {item.name}
+                          </h3>
                           <button
                             onClick={() => removeItem(item.id)}
                             className="text-red-500 hover:text-red-700 p-1"

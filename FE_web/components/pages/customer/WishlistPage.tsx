@@ -3,7 +3,7 @@ import CustomerLayout from '../../layout/CustomerLayout';
 import { Heart, ShoppingCart, Share2, Star, Filter, Grid, List } from 'lucide-react';
 
 interface WishlistPageProps {
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: string, data?: any) => void;
 }
 
 interface WishlistItem {

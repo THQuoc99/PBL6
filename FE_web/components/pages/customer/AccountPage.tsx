@@ -3,11 +3,11 @@ import CustomerLayout from '../../layout/CustomerLayout';
 import { 
   User, ShoppingBag, Heart, Settings, LogOut, Edit, Camera, MapPin, 
   Phone, Mail, Gift, Calendar, Plus, Trash2, Check, Star, Upload, Store,
-  Truck, Clock, MapPinIcon, X, Package, CheckCircle
+  Truck, Clock, MapPinIcon, X, Package, CheckCircle, Ticket, Tag
 } from 'lucide-react';
 
 interface AccountPageProps {
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: string, data?: any) => void;
 }
 
 interface Address {
@@ -20,6 +20,32 @@ interface Address {
   specificAddress: string;
   address: string;
   isDefault: boolean;
+}
+
+interface Voucher {
+  voucher_id: number;
+  code: string;
+  type: 'platform' | 'seller';
+  seller?: {
+    id: number;
+    name: string;
+    logo?: string;
+  };
+  discount_type: 'percent' | 'fixed';
+  discount_value: number;
+  min_order_amount: number;
+  max_discount?: number;
+  start_date: string;
+  end_date: string;
+  usage_limit?: number;
+  per_user_limit: number;
+  is_active: boolean;
+  is_auto: boolean;
+  description?: string;
+  // User voucher specific fields
+  saved_at: string;
+  used_count: number;
+  can_use: boolean;
 }
 
 export default function AccountPage({ onNavigate }: AccountPageProps) {
@@ -42,6 +68,7 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
   const [formPosition, setFormPosition] = useState<'top' | 'bottom' | null>(null); // Vị trí hiển thị form
   const [showTrackingModal, setShowTrackingModal] = useState(false);
   const [selectedOrderTracking, setSelectedOrderTracking] = useState<string | null>(null);
+  const [voucherTab, setVoucherTab] = useState('available'); // available, used, expired
   
   // Address management state
   const [addresses, setAddresses] = useState<Address[]>([
@@ -212,6 +239,85 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
           variant: 'Xám - Size 44'
         }
       ]
+    }
+  ];
+
+  // Mock voucher data mapping với backend
+  const userVouchers: Voucher[] = [
+    {
+      voucher_id: 1,
+      code: 'WELCOME10',
+      type: 'platform',
+      discount_type: 'percent',
+      discount_value: 10,
+      min_order_amount: 500000,
+      max_discount: 100000,
+      start_date: '2024-11-01',
+      end_date: '2024-12-31',
+      per_user_limit: 1,
+      is_active: true,
+      is_auto: false,
+      description: 'Voucher chào mừng thành viên mới',
+      saved_at: '2024-11-10T09:00:00Z',
+      used_count: 0,
+      can_use: true
+    },
+    {
+      voucher_id: 2,
+      code: 'SHOEX50K',
+      type: 'seller',
+      seller: {
+        id: 1,
+        name: 'SHOEX Official Store',
+        logo: '/api/placeholder/32/32'
+      },
+      discount_type: 'fixed',
+      discount_value: 50000,
+      min_order_amount: 1000000,
+      start_date: '2024-11-01',
+      end_date: '2024-11-30',
+      per_user_limit: 2,
+      is_active: true,
+      is_auto: false,
+      description: 'Giảm 50K cho đơn hàng từ 1 triệu',
+      saved_at: '2024-11-12T14:30:00Z',
+      used_count: 1,
+      can_use: true
+    },
+    {
+      voucher_id: 3,
+      code: 'FREESHIP',
+      type: 'platform',
+      discount_type: 'fixed',
+      discount_value: 25000,
+      min_order_amount: 300000,
+      start_date: '2024-11-15',
+      end_date: '2024-11-20',
+      per_user_limit: 1,
+      is_active: true,
+      is_auto: false,
+      description: 'Miễn phí vận chuyển cho đơn từ 300K',
+      saved_at: '2024-11-15T10:00:00Z',
+      used_count: 1,
+      can_use: false
+    },
+    {
+      voucher_id: 4,
+      code: 'EXPIRED20',
+      type: 'platform',
+      discount_type: 'percent',
+      discount_value: 20,
+      min_order_amount: 800000,
+      max_discount: 200000,
+      start_date: '2024-10-01',
+      end_date: '2024-10-31',
+      per_user_limit: 1,
+      is_active: false,
+      is_auto: false,
+      description: 'Voucher đã hết hạn',
+      saved_at: '2024-10-15T08:00:00Z',
+      used_count: 0,
+      can_use: false
     }
   ];
 
@@ -498,7 +604,7 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
     { id: 'profile', label: 'Thông tin cá nhân', icon: User },
     { id: 'orders', label: 'Đơn hàng', icon: ShoppingBag },
     { id: 'addresses', label: 'Địa chỉ', icon: MapPin },
-    { id: 'wishlist', label: 'Yêu thích', icon: Heart },
+    { id: 'vouchers', label: 'Voucher', icon: Ticket },
     { id: 'settings', label: 'Cài đặt', icon: Settings }
   ];
 
@@ -1224,14 +1330,15 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
                           <div className="p-6">
                             <div className="space-y-4">
                               {order.items.map((item) => (
-                                <div key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                                <div key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors group">
                                   <img 
                                     src={item.image} 
                                     alt={item.name}
-                                    className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                                    className="w-20 h-20 object-cover rounded-lg border border-gray-200 group-hover:border-blue-300 transition-colors"
+                                    onClick={() => onNavigate?.('product-detail', { productId: item.id })}
                                   />
-                                  <div className="flex-1">
-                                    <h4 className="font-medium text-gray-900 mb-1">{item.name}</h4>
+                                  <div className="flex-1" onClick={() => onNavigate?.('product-detail', { productId: item.id })}>
+                                    <h4 className="font-medium text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{item.name}</h4>
                                     <p className="text-sm text-gray-600 mb-2">Phân loại: {item.variant}</p>
                                     <div className="flex items-center justify-between">
                                       <span className="text-sm text-gray-600">Số lượng: x{item.quantity}</span>
@@ -1394,24 +1501,182 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
                 </div>
               )}
 
-              {activeTab === 'wishlist' && (
+              {activeTab === 'vouchers' && (
                 <div>
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold text-gray-900">Danh sách yêu thích</h2>
-                    <button
-                      onClick={() => onNavigate?.('wishlist')}
-                      className="text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      Xem tất cả →
-                    </button>
+                    <h2 className="text-2xl font-bold text-gray-900">Quản lý Voucher</h2>
+                    <div className="text-sm text-gray-600">
+                      Tổng: {userVouchers.length} voucher đã lưu
+                    </div>
                   </div>
-                  <p className="text-gray-600 mb-4">Bạn có {stats.savedItems} sản phẩm trong danh sách yêu thích</p>
-                  <button
-                    onClick={() => onNavigate?.('wishlist')}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Xem danh sách yêu thích
-                  </button>
+
+                  {/* Voucher Tabs */}
+                  <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6">
+                    {[
+                      { id: 'available', label: 'Có thể dùng', count: userVouchers.filter(v => v.can_use && v.is_active && new Date(v.end_date) > new Date()).length },
+                      { id: 'used', label: 'Đã sử dụng', count: userVouchers.filter(v => !v.can_use && v.used_count > 0).length },
+                      { id: 'expired', label: 'Hết hạn', count: userVouchers.filter(v => !v.is_active || new Date(v.end_date) <= new Date()).length }
+                    ].map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setVoucherTab(tab.id)}
+                        className={`flex-1 py-3 px-4 rounded-md text-sm font-medium transition-colors ${
+                          voucherTab === tab.id
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-gray-600 hover:text-gray-900'
+                        }`}
+                      >
+                        {tab.label} ({tab.count})
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Voucher List */}
+                  <div className="space-y-4">
+                    {userVouchers
+                      .filter(voucher => {
+                        if (voucherTab === 'available') {
+                          return voucher.can_use && voucher.is_active && new Date(voucher.end_date) > new Date();
+                        } else if (voucherTab === 'used') {
+                          return !voucher.can_use && voucher.used_count > 0;
+                        } else if (voucherTab === 'expired') {
+                          return !voucher.is_active || new Date(voucher.end_date) <= new Date();
+                        }
+                        return true;
+                      })
+                      .map((voucher) => {
+                        const isExpired = new Date(voucher.end_date) <= new Date();
+                        const isUsedUp = !voucher.can_use && voucher.used_count >= voucher.per_user_limit;
+                        
+                        return (
+                          <div
+                            key={voucher.voucher_id}
+                            className={`border rounded-xl p-6 transition-all ${
+                              voucher.can_use && !isExpired
+                                ? 'border-blue-200 bg-blue-50 hover:shadow-md'
+                                : 'border-gray-200 bg-gray-50 opacity-75'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                {/* Voucher Header */}
+                                <div className="flex items-center gap-3 mb-3">
+                                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                    voucher.type === 'platform' 
+                                      ? 'bg-purple-100 text-purple-700' 
+                                      : 'bg-green-100 text-green-700'
+                                  }`}>
+                                    <Tag className="h-3 w-3 mr-1" />
+                                    {voucher.type === 'platform' ? 'Platform' : voucher.seller?.name}
+                                  </div>
+                                  
+                                  {/* Status badges */}
+                                  {isExpired && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-700">
+                                      Hết hạn
+                                    </span>
+                                  )}
+                                  {isUsedUp && (
+                                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                                      Đã hết lượt
+                                    </span>
+                                  )}
+                                </div>
+
+                                {/* Voucher Code */}
+                                <div className="flex items-center gap-2 mb-2">
+                                  <code className="bg-gray-800 text-white px-3 py-1 rounded font-mono text-lg font-bold">
+                                    {voucher.code}
+                                  </code>
+                                  <button 
+                                    onClick={() => navigator.clipboard.writeText(voucher.code)}
+                                    className="text-blue-600 hover:text-blue-700 text-sm"
+                                  >
+                                    Sao chép
+                                  </button>
+                                </div>
+
+                                {/* Voucher Details */}
+                                <div className="text-gray-900 font-semibold text-lg mb-1">
+                                  {voucher.discount_type === 'percent' 
+                                    ? `Giảm ${voucher.discount_value}%${voucher.max_discount ? ` (tối đa ${formatPrice(voucher.max_discount)})` : ''}`
+                                    : `Giảm ${formatPrice(voucher.discount_value)}`
+                                  }
+                                </div>
+
+                                <p className="text-gray-600 mb-3">{voucher.description}</p>
+
+                                {/* Voucher Info Grid */}
+                                <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                                  <div>
+                                    <span className="font-medium">Đơn tối thiểu:</span> {formatPrice(voucher.min_order_amount)}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Hết hạn:</span> {new Date(voucher.end_date).toLocaleDateString('vi-VN')}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Đã dùng:</span> {voucher.used_count}/{voucher.per_user_limit}
+                                  </div>
+                                  <div>
+                                    <span className="font-medium">Lưu từ:</span> {new Date(voucher.saved_at).toLocaleDateString('vi-VN')}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Action Button */}
+                              <div className="ml-6">
+                                {voucher.can_use && !isExpired ? (
+                                  <button
+                                    onClick={() => onNavigate?.('cart')}
+                                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                                  >
+                                    Dùng ngay
+                                  </button>
+                                ) : (
+                                  <div className="text-gray-400 text-sm font-medium px-6 py-2">
+                                    {isExpired ? 'Đã hết hạn' : isUsedUp ? 'Hết lượt dùng' : 'Không khả dụng'}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Empty State */}
+                  {userVouchers.filter(voucher => {
+                    if (voucherTab === 'available') {
+                      return voucher.can_use && voucher.is_active && new Date(voucher.end_date) > new Date();
+                    } else if (voucherTab === 'used') {
+                      return !voucher.can_use && voucher.used_count > 0;
+                    } else if (voucherTab === 'expired') {
+                      return !voucher.is_active || new Date(voucher.end_date) <= new Date();
+                    }
+                    return true;
+                  }).length === 0 && (
+                    <div className="text-center py-12">
+                      <Gift className="h-16 w-16 mx-auto text-gray-300 mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        {voucherTab === 'available' && 'Không có voucher khả dụng'}
+                        {voucherTab === 'used' && 'Chưa sử dụng voucher nào'}
+                        {voucherTab === 'expired' && 'Không có voucher hết hạn'}
+                      </h3>
+                      <p className="text-gray-600 mb-6">
+                        {voucherTab === 'available' && 'Hãy khám phá các voucher mới tại trang chính'}
+                        {voucherTab === 'used' && 'Voucher đã sử dụng sẽ hiển thị ở đây'}
+                        {voucherTab === 'expired' && 'Voucher hết hạn sẽ hiển thị ở đây'}
+                      </p>
+                      {voucherTab === 'available' && (
+                        <button
+                          onClick={() => onNavigate?.('promotions')}
+                          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Khám phá voucher
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
