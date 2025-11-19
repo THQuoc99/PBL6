@@ -61,7 +61,11 @@ export class StoreService {
       console.log('Store từ localStorage:', cached.name);
       return cached;
     }
-    const userId = authService.getCurrentUser().id;
+    const userId = authService.getCurrentUser()?.id;
+    if (!userId) {
+      console.log('Không có userId, không thể lấy store');
+      return null;
+    }
     // 2. Nếu chưa có thì gọi API
     return await this.loadMyOwnedStore(userId);
   }
