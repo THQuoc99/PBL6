@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CustomerLayout from '../../layout/CustomerLayout';
+import { authService } from '../../../services/auth';
 import { 
   User, ShoppingBag, Heart, Settings, LogOut, Edit, Camera, MapPin, 
   Phone, Mail, Gift, Calendar, Plus, Trash2, Check, Star, Upload, Store,
@@ -51,18 +52,96 @@ interface Voucher {
 export default function AccountPage({ onNavigate }: AccountPageProps) {
   const [activeTab, setActiveTab] = useState('profile');
   const [userInfo, setUserInfo] = useState({
-    name: 'Nguyễn Văn A',
-    email: 'nguyenvana@email.com',
-    phone: '0123 456 789',
-    address: '123 Đường ABC, Quận 1, TP.HCM',
-    birthday: '1990-01-15',
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    birthday: '',
     gender: 'male',
-    memberSince: '2023-01-15',
-    avatar: '/api/placeholder/100/100'
+    memberSince: '',
+    avatar: ''
   });
 
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [showAddressForm, setShowAddressForm] = useState(false);
+
+  // Load user profile on component mount
+  useEffect(() => {
+    if (authService.isAuthenticated()) {
+      loadUserProfile();
+    } else {
+      // Thử lấy thông tin từ localStorage
+      const currentUser = authService.getCurrentUser();
+      if (currentUser) {
+        setUserInfo({
+          name: currentUser.fullName || currentUser.username || 'Người dùng',
+          email: currentUser.email || '',
+          phone: currentUser.phone || '',
+          address: '',
+          birthday: '',
+          gender: 'male',
+          memberSince: currentUser.dateJoined || '',
+          avatar: currentUser.avatarUrl || ''
+        });
+      }
+      setLoading(false);
+    }
+  }, []);
+
+  const loadUserProfile = async () => {
+    try {
+      setLoading(true);
+      const response = await authService.getUserProfile();
+      
+      if (response.success && response.user) {
+        const user = response.user;
+        setUserInfo({
+          name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'Người dùng',
+          email: user.email || '',
+          phone: user.phone || '',
+          address: '', // Có thể lấy từ address API riêng
+          birthday: user.birthDate || '', // ✅ Load birthDate từ backend
+          gender: 'male', // Có thể thêm field này vào backend
+          memberSince: user.dateJoined || '',
+          avatar: user.avatarUrl || ''
+        });
+      } else {
+        // Fallback: Lấy thông tin từ localStorage
+        const currentUser = authService.getCurrentUser();
+        if (currentUser) {
+          setUserInfo({
+            name: currentUser.fullName || currentUser.username || 'Người dùng',
+            email: currentUser.email || '',
+            phone: currentUser.phone || '',
+            address: '',
+            birthday: '',
+            gender: 'male',
+            memberSince: currentUser.dateJoined || '',
+            avatar: currentUser.avatarUrl || ''
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      // Fallback: Lấy thông tin từ localStorage
+      const currentUser = authService.getCurrentUser();
+      if (currentUser) {
+        setUserInfo({
+          name: currentUser.fullName || currentUser.username || 'Người dùng',
+          email: currentUser.email || '',
+          phone: currentUser.phone || '',
+          address: '',
+          birthday: '',
+          gender: 'male',
+          memberSince: currentUser.dateJoined || '',
+          avatar: currentUser.avatarUrl || ''
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
   const [orderTab, setOrderTab] = useState('all'); // Tab đơn hàng hiện tại
   const [formPosition, setFormPosition] = useState<'top' | 'bottom' | null>(null); // Vị trí hiển thị form
@@ -490,17 +569,78 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
   };
 
   // Avatar upload handler
-  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setUserInfo({
-          ...userInfo,
-          avatar: e.target?.result as string
-        });
-      };
-      reader.readAsDataURL(file);
+      try {
+        setLoading(true);
+        
+        // Validate file size (5MB max)
+        if (file.size > 5 * 1024 * 1024) {
+          alert('Kích thước file không được vượt quá 5MB!');
+          return;
+        }
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          alert('Vui lòng chọn file hình ảnh!');
+          return;
+        }
+        
+        const response = await authService.uploadAvatar(file);
+        
+        if (response.success) {
+          // Update local state immediately for better UX
+          setUserInfo({
+            ...userInfo,
+            avatar: response.avatarUrl || ''
+          });
+          alert('Tải lên avatar thành công!');
+          // Reload user profile to get updated data
+          await loadUserProfile();
+        } else {
+          alert(`Tải lên thất bại: ${response.message}`);
+        }
+      } catch (error) {
+        console.error('Error uploading avatar:', error);
+        alert('Có lỗi xảy ra khi tải lên avatar!');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  // Avatar delete handler
+  const handleAvatarDelete = async () => {
+    if (!userInfo.avatar) {
+      alert('Không có avatar để xóa!');
+      return;
+    }
+
+    if (confirm('Bạn có chắc chắn muốn xóa avatar?')) {
+      try {
+        setLoading(true);
+        
+        const response = await authService.deleteAvatar();
+        
+        if (response.success) {
+          // Update local state immediately for better UX
+          setUserInfo({
+            ...userInfo,
+            avatar: ''
+          });
+          alert('Xóa avatar thành công!');
+          // Reload user profile to get updated data
+          await loadUserProfile();
+        } else {
+          alert(`Xóa avatar thất bại: ${response.message}`);
+        }
+      } catch (error) {
+        console.error('Error deleting avatar:', error);
+        alert('Có lỗi xảy ra khi xóa avatar!');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -608,14 +748,82 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
     { id: 'settings', label: 'Cài đặt', icon: Settings }
   ];
 
-  const handleSave = () => {
-    setIsEditing(false);
-    alert('Cập nhật thông tin thành công!');
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      
+      // Parse fullName into firstName and lastName
+      const nameParts = userInfo.name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      // Format birthDate để đảm bảo format YYYY-MM-DD
+      const formatBirthDate = (dateValue: string) => {
+        if (!dateValue || !dateValue.trim()) return undefined;
+        
+        // Nếu đã là format YYYY-MM-DD thì giữ nguyên
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+          return dateValue;
+        }
+        
+        // Nếu là format DD/MM/YYYY, convert thành YYYY-MM-DD
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateValue)) {
+          const [day, month, year] = dateValue.split('/');
+          return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+        
+        // Nếu là Date object hoặc các format khác
+        try {
+          const date = new Date(dateValue);
+          if (isNaN(date.getTime())) return undefined;
+          return date.toISOString().split('T')[0];
+        } catch {
+          return undefined;
+        }
+      };
+      
+      const birthDate = formatBirthDate(userInfo.birthday);
+      
+      console.log('📝 Preparing update data:', {
+        originalBirthday: userInfo.birthday,
+        formattedBirthDate: birthDate,
+        fullName: userInfo.name,
+        phone: userInfo.phone,
+        email: userInfo.email
+      });
+      
+      const updateData = {
+        fullName: userInfo.name,
+        firstName: firstName,
+        lastName: lastName,
+        phone: userInfo.phone,
+        email: userInfo.email,
+        ...(birthDate && { birthDate: birthDate }) // Chỉ thêm nếu có giá trị
+      };
+      
+      console.log('📤 Final updateData being sent:', updateData);
+      
+      const response = await authService.updateUserProfile(updateData);
+      
+      if (response.success) {
+        setIsEditing(false);
+        alert('Cập nhật thông tin thành công!');
+        // Reload user profile to get updated data
+        await loadUserProfile();
+      } else {
+        alert(`Cập nhật thất bại: ${response.message}`);
+      }
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      alert('Có lỗi xảy ra khi cập nhật thông tin!');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = () => {
     if (confirm('Bạn có chắc chắn muốn đăng xuất?')) {
-      onNavigate?.('login');
+      onNavigate?.('home');
     }
   };
 
@@ -1076,11 +1284,24 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
                   className="hidden"
                 />
               </label>
+              
+              {/* Nút xóa avatar - chỉ hiển thị khi có avatar */}
+              {userInfo.avatar && (
+                <button
+                  onClick={handleAvatarDelete}
+                  className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer hover:bg-red-600 transition-colors"
+                  title="Xóa avatar"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
             </div>
             
             <div className="text-center md:text-left flex-1">
-              <h1 className="text-3xl font-bold mb-2">{userInfo.name}</h1>
-              <p className="text-blue-100 mb-4">Thành viên từ {new Date(userInfo.memberSince).getFullYear()}</p>
+              <h1 className="text-3xl font-bold mb-2">{userInfo.name || 'Người dùng'}</h1>
+              <p className="text-blue-100 mb-4">
+                Thành viên từ {userInfo.memberSince ? new Date(userInfo.memberSince).getFullYear() : 'N/A'}
+              </p>
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div>
@@ -1142,16 +1363,38 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
                 <div>
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold text-gray-900">Thông tin cá nhân</h2>
-                    <button
-                      onClick={() => setIsEditing(!isEditing)}
-                      className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <Edit className="h-4 w-4" />
-                      <span>{isEditing ? 'Hủy' : 'Chỉnh sửa'}</span>
-                    </button>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => loadUserProfile()}
+                        disabled={loading}
+                        className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>Tải lại</span>
+                      </button>
+                      <button
+                        onClick={() => setIsEditing(!isEditing)}
+                        disabled={loading}
+                        className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Edit className="h-4 w-4" />
+                        <span>{loading ? 'Đang tải...' : isEditing ? 'Hủy' : 'Chỉnh sửa'}</span>
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {loading ? (
+                    <div className="flex justify-center items-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <span className="ml-2 text-gray-600">Đang tải thông tin...</span>
+                    </div>
+                  ) : (
+                    <>
+
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Họ tên</label>
                       <div className="flex items-center space-x-3">
@@ -1159,9 +1402,10 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
                         <input
                           type="text"
                           value={userInfo.name}
-                          disabled={!isEditing}
+                          disabled={!isEditing || loading}
                           onChange={(e) => setUserInfo({...userInfo, name: e.target.value})}
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-50"
+                          placeholder="Nhập họ tên"
                         />
                       </div>
                     </div>
@@ -1173,9 +1417,10 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
                         <input
                           type="email"
                           value={userInfo.email}
-                          disabled={!isEditing}
+                          disabled={!isEditing || loading}
                           onChange={(e) => setUserInfo({...userInfo, email: e.target.value})}
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-50"
+                          placeholder="Nhập email"
                         />
                       </div>
                     </div>
@@ -1187,9 +1432,10 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
                         <input
                           type="tel"
                           value={userInfo.phone}
-                          disabled={!isEditing}
+                          disabled={!isEditing || loading}
                           onChange={(e) => setUserInfo({...userInfo, phone: e.target.value})}
                           className="flex-1 px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-50"
+                          placeholder="Nhập số điện thoại"
                         />
                       </div>
                     </div>
@@ -1227,9 +1473,10 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
                     <div className="mt-8 flex space-x-4">
                       <button
                         onClick={handleSave}
-                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                        disabled={loading}
+                        className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Lưu thay đổi
+                        {loading ? 'Đang lưu...' : 'Lưu thay đổi'}
                       </button>
                       <button
                         onClick={() => setIsEditing(false)}
@@ -1238,6 +1485,8 @@ export default function AccountPage({ onNavigate }: AccountPageProps) {
                         Hủy bỏ
                       </button>
                     </div>
+                  )}
+                  </>
                   )}
                 </div>
               )}

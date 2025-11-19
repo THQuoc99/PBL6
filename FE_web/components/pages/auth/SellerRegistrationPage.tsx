@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AuthLayout from '../../layout/AuthLayout';
 import { 
   Store, 
@@ -17,6 +17,7 @@ import {
   User,
   Globe
 } from 'lucide-react';
+import { storeService } from '../../../services/store';
 
 interface SellerRegistrationPageProps {
   onComplete?: () => void;
@@ -25,9 +26,21 @@ interface SellerRegistrationPageProps {
 
 type RegistrationStep = 'store-info' | 'shipping-setup' | 'identity-verification' | 'tax-info' | 'complete';
 
+interface Address {
+  id: string;
+  name: string;
+  phone: string;
+  province: string;
+  ward: string;
+  street: string;
+  specificAddress: string;
+  address: string;
+  isDefault: boolean;
+}
+
 interface StoreInfo {
   shopName: string;
-  address: string;
+  selectedAddressId: string;
   email: string;
   phone: string;
 }
@@ -53,9 +66,20 @@ export default function SellerRegistrationPage({ onComplete, onBackToCustomer }:
   const [currentStep, setCurrentStep] = useState<RegistrationStep>('store-info');
   const [storeInfo, setStoreInfo] = useState<StoreInfo>({
     shopName: '',
-    address: '',
+    selectedAddressId: '',
     email: '',
     phone: ''
+  });
+  const [showAddressList, setShowAddressList] = useState(false);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null);
+  const [newAddress, setNewAddress] = useState({
+    name: '',
+    phone: '',
+    province: '',
+    ward: '',
+    street: '',
+    specificAddress: ''
   });
   const [identityInfo, setIdentityInfo] = useState<IdentityInfo>({
     nationality: 'Việt Nam',
@@ -72,6 +96,79 @@ export default function SellerRegistrationPage({ onComplete, onBackToCustomer }:
     taxCode: '',
     dataConfirmation: false
   });
+
+  // Địa chỉ lấy từ backend
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [loadingAddresses, setLoadingAddresses] = useState(false);
+
+  useEffect(() => {
+    const fetchAddresses = async () => {
+      setLoadingAddresses(true);
+      try {
+        const data = await storeService.getAddressStores();
+        const mapped: Address[] = (data || []).map((item: any, idx: number) => ({
+          id: String(item.addressId),
+          name: item.isDefault ? 'Địa chỉ mặc định' : `Địa chỉ ${idx + 1}`,
+          phone: '', // Nếu backend trả về phone thì map vào
+          province: item.province,
+          ward: item.ward,
+          street: item.hamlet || '',
+          specificAddress: item.detail,
+          address: `${item.province}, ${item.ward}, ${item.hamlet || ''}, ${item.detail}`,
+          isDefault: item.isDefault,
+        }));
+        setAddresses(mapped);
+      } catch (e) {
+        setAddresses([]);
+      }
+      setLoadingAddresses(false);
+    };
+    fetchAddresses();
+  }, []);
+
+  const defaultAddress = addresses.find(addr => addr.isDefault);
+  const currentAddress = addresses.find(addr => addr.id === storeInfo.selectedAddressId) || defaultAddress;
+
+  const handleSelectAddress = (addressId: string) => {
+    setStoreInfo(prev => ({ ...prev, selectedAddressId: addressId }));
+    setShowAddressList(false);
+  };
+
+  const handleEditAddress = (address: Address) => {
+    setEditingAddress(address);
+    setNewAddress({
+      name: address.name,
+      phone: address.phone,
+      province: address.province,
+      ward: address.ward,
+      street: address.street,
+      specificAddress: address.specificAddress
+    });
+    setShowAddressForm(true);
+    setShowAddressList(false);
+  };
+
+  const handleSaveAddress = () => {
+    if (editingAddress) {
+      const fullAddress = `${newAddress.province}, ${newAddress.ward}, ${newAddress.street}, ${newAddress.specificAddress}`;
+      console.log('Updating address:', { ...editingAddress, ...newAddress, address: fullAddress });
+    } else {
+      const fullAddress = `${newAddress.province}, ${newAddress.ward}, ${newAddress.street}, ${newAddress.specificAddress}`;
+      console.log('Adding new address:', { ...newAddress, address: fullAddress });
+    }
+    setShowAddressForm(false);
+    setEditingAddress(null);
+    setNewAddress({ name: '', phone: '', province: '', ward: '', street: '', specificAddress: '' });
+  };
+
+  const handleCancelAddressForm = () => {
+    setShowAddressForm(false);
+    setEditingAddress(null);
+    setNewAddress({ name: '', phone: '', province: '', ward: '', street: '', specificAddress: '' });
+    if (showAddressList) {
+      setShowAddressList(true);
+    }
+  };
 
   const steps = [
     { key: 'store-info', title: 'Thông tin Shop', icon: Store },
@@ -101,6 +198,30 @@ export default function SellerRegistrationPage({ onComplete, onBackToCustomer }:
     const file = event.target.files?.[0];
     if (file) {
       setIdentityInfo(prev => ({ ...prev, [field]: file }));
+    }
+  };
+
+  const handleCreateStore = async () => {
+    if (!storeInfo.shopName || !storeInfo.email || !storeInfo.phone || !currentAddress) return;
+    const input = {
+      name: storeInfo.shopName,
+      email: storeInfo.email,
+      phone: storeInfo.phone,
+      province: currentAddress.province,
+      ward: currentAddress.ward,
+      hamlet: currentAddress.street, // street chính là hamlet
+      detail: currentAddress.specificAddress // chỉ lấy địa chỉ cụ thể
+    };
+    try {
+      const result = await storeService.createStore(input);
+      if (result.success) {
+        // Có thể lưu lại storeId hoặc chuyển bước tiếp theo
+        handleNext();
+      } else {
+        alert(result.message);
+      }
+    } catch (err) {
+      alert('Đăng ký cửa hàng thất bại');
     }
   };
 
@@ -136,11 +257,245 @@ export default function SellerRegistrationPage({ onComplete, onBackToCustomer }:
           <label className="block text-sm font-medium text-gray-700 mb-2">
             <span className="text-red-500">*</span> Địa chỉ lấy hàng
           </label>
-          <button className="w-full px-3 py-3 border border-gray-300 rounded-lg text-left text-gray-500 hover:bg-gray-50">
-            <Plus className="inline h-4 w-4 mr-2" />
-            Thêm
-          </button>
-          <p className="text-sm text-red-500 mt-1">Vui lòng thiết lập địa chỉ lấy hàng của bạn</p>
+          
+          {!showAddressList && !showAddressForm && currentAddress && (
+            <div className="border border-gray-200 rounded-xl p-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h4 className="font-medium">{currentAddress.name}</h4>
+                    <span className="text-gray-500">|</span>
+                    <span className="text-gray-600">{currentAddress.phone}</span>
+                    {currentAddress.isDefault && (
+                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                        Mặc định
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-gray-700">{currentAddress.address}</p>
+                </div>
+                <button
+                  onClick={() => setShowAddressList(true)}
+                  className="text-blue-600 hover:text-blue-800 font-medium px-4 py-2 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                >
+                  Thay đổi
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!currentAddress && !showAddressList && !showAddressForm && (
+            <button 
+              onClick={() => setShowAddressForm(true)}
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg text-left text-gray-500 hover:bg-gray-50"
+            >
+              <Plus className="inline h-4 w-4 mr-2" />
+              Thêm địa chỉ lấy hàng
+            </button>
+          )}
+
+          {showAddressList && !showAddressForm && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-medium">Chọn địa chỉ lấy hàng</h3>
+                <button
+                  onClick={() => {
+                    setShowAddressForm(true);
+                    setShowAddressList(false);
+                    setEditingAddress(null);
+                  }}
+                  className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                >
+                  <Plus className="h-4 w-4" />
+                  Thêm địa chỉ mới
+                </button>
+              </div>
+
+              <div className="space-y-3 mb-4">
+                {addresses.map((address) => (
+                  <div
+                    key={address.id}
+                    className={`border rounded-xl p-4 cursor-pointer transition-colors ${
+                      storeInfo.selectedAddressId === address.id 
+                        ? 'border-blue-500 bg-blue-50' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => handleSelectAddress(address.id)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-medium">{address.name}</h4>
+                          <span className="text-gray-500">|</span>
+                          <span className="text-gray-600">{address.phone}</span>
+                          {address.isDefault && (
+                            <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                              Mặc định
+                            </span>
+                          )}
+                          {storeInfo.selectedAddressId === address.id && (
+                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                              Đang chọn
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-gray-700">{address.address}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditAddress(address);
+                          }}
+                          className="p-2 text-gray-400 hover:text-blue-600"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        {!address.isDefault && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('Delete address:', address.id);
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-600"
+                          >
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={() => setShowAddressList(false)}
+                className="w-full border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Quay lại
+              </button>
+            </div>
+          )}
+
+          {showAddressForm && (
+            <div>
+              <h4 className="font-medium mb-4">
+                {editingAddress ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ mới'}
+              </h4>
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input
+                    type="text"
+                    placeholder="Tên cửa hàng/kho *"
+                    value={newAddress.name}
+                    onChange={(e) => setNewAddress({...newAddress, name: e.target.value})}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Số điện thoại *"
+                    value={newAddress.phone}
+                    onChange={(e) => setNewAddress({...newAddress, phone: e.target.value})}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <select
+                    value={newAddress.province}
+                    onChange={(e) => setNewAddress({...newAddress, province: e.target.value, ward: ''})}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Chọn Tỉnh/Thành phố *</option>
+                    <option value="TP.Hồ Chí Minh">TP.Hồ Chí Minh</option>
+                    <option value="Hà Nội">Hà Nội</option>
+                    <option value="Đà Nẵng">Đà Nẵng</option>
+                    <option value="Cần Thơ">Cần Thơ</option>
+                    <option value="Hải Phòng">Hải Phòng</option>
+                  </select>
+                  
+                  <select
+                    value={newAddress.ward}
+                    onChange={(e) => setNewAddress({...newAddress, ward: e.target.value})}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={!newAddress.province}
+                  >
+                    <option value="">Chọn Phường/Xã *</option>
+                    {newAddress.province === 'TP.Hồ Chí Minh' && (
+                      <>
+                        <option value="Phường Bến Nghé">Phường Bến Nghé</option>
+                        <option value="Phường Bến Thành">Phường Bến Thành</option>
+                        <option value="Phường Cô Giang">Phường Cô Giang</option>
+                        <option value="Phường Nguyễn Thái Bình">Phường Nguyễn Thái Bình</option>
+                      </>
+                    )}
+                    {newAddress.province === 'Hà Nội' && (
+                      <>
+                        <option value="Phường Lê Đại Hành">Phường Lê Đại Hành</option>
+                        <option value="Phường Bách Khoa">Phường Bách Khoa</option>
+                        <option value="Phường Đồng Nhân">Phường Đồng Nhân</option>
+                        <option value="Phường Phố Huế">Phường Phố Huế</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+                
+                <select
+                  value={newAddress.street}
+                  onChange={(e) => setNewAddress({...newAddress, street: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={!newAddress.ward}
+                >
+                  <option value="">Chọn Đường/Khu vực *</option>
+                  {newAddress.ward === 'Phường Bến Nghé' && (
+                    <>
+                      <option value="Đường Lê Lợi">Đường Lê Lợi</option>
+                      <option value="Đường Nguyễn Huệ">Đường Nguyễn Huệ</option>
+                      <option value="Đường Đồng Khởi">Đường Đồng Khởi</option>
+                    </>
+                  )}
+                  {newAddress.ward === 'Phường Bến Thành' && (
+                    <>
+                      <option value="Đường Lê Thị Riêng">Đường Lê Thị Riêng</option>
+                      <option value="Đường Tôn Thất Đạm">Đường Tôn Thất Đạm</option>
+                      <option value="Đường Phạm Ngũ Lão">Đường Phạm Ngũ Lão</option>
+                    </>
+                  )}
+                </select>
+
+                <input
+                  type="text"
+                  placeholder="Địa chỉ cụ thể (số nhà, tòa nhà) *"
+                  value={newAddress.specificAddress}
+                  onChange={(e) => setNewAddress({...newAddress, specificAddress: e.target.value})}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={handleSaveAddress}
+                    className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    {editingAddress ? 'Cập nhật' : 'Thêm địa chỉ'}
+                  </button>
+                  <button
+                    onClick={handleCancelAddressForm}
+                    className="flex-1 border border-gray-300 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!currentAddress && !showAddressList && !showAddressForm && (
+            <p className="text-sm text-red-500 mt-1">Vui lòng thiết lập địa chỉ lấy hàng của bạn</p>
+          )}
         </div>
 
         <div>

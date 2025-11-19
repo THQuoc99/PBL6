@@ -39,11 +39,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',  # Thêm CORS support
     "graphene_django",
     "graphene_file_upload",  # Thêm để support file upload trong GraphQL
     "chatbot", 
     "users",     
+    "store",     # Thêm app store
     "products",   
+    "collection", # Thêm app collection
     "cart",      # Thêm app cart
     "orders",    
     "payments",   
@@ -54,6 +57,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # CORS phải ở đầu
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -84,7 +88,7 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 # GraphQL Configuration
 GRAPHENE = {
-    "SCHEMA": "graphql_api.api.schema",  # Đường dẫn đến schema
+    "SCHEMA": "graphql.api.schema",  # Đường dẫn đến schema
 }
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
@@ -152,3 +156,26 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# CORS Configuration - Cho phép frontend truy cập
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Next.js default port
+    "http://127.0.0.1:3000",
+]
+
+# Hoặc cho phép tất cả (CHỈ cho development)
+CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]

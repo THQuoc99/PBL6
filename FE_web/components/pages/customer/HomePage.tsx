@@ -108,10 +108,16 @@ export default function CustomerHomePage({ onNavigateToSeller, onNavigate }: Cus
                 Hơn 1000+ mẫu giày chính hãng từ các thương hiệu hàng đầu thế giới
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <button className="bg-white text-blue-600 font-semibold py-3 px-8 rounded-lg hover:bg-gray-100 transition-colors">
+                <button 
+                  onClick={() => onNavigate?.('customer-products')}
+                  className="bg-white text-blue-600 font-semibold py-3 px-8 rounded-lg hover:bg-gray-100 transition-colors"
+                >
                   Mua ngay
                 </button>
-                <button className="border-2 border-white text-white font-semibold py-3 px-8 rounded-lg hover:bg-white hover:text-blue-600 transition-colors">
+                <button 
+                  onClick={() => onNavigate?.('collections')}
+                  className="border-2 border-white text-white font-semibold py-3 px-8 rounded-lg hover:bg-white hover:text-blue-600 transition-colors"
+                >
                   Xem bộ sưu tập
                 </button>
               </div>

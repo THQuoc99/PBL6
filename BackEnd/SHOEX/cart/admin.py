@@ -152,7 +152,7 @@ class CartItemAdmin(admin.ModelAdmin):
         'created_at',
         'updated_at',
         'variant__product__category',
-        'variant__product__seller'
+        'variant__product__store'
     )
     search_fields = (
         'cart__user__username',
@@ -290,7 +290,7 @@ class WishlistAdmin(admin.ModelAdmin):
     list_filter = (
         'created_at',
         'variant__product__category',
-        'variant__product__seller'
+        'variant__product__store'
     )
     search_fields = (
         'user__username',

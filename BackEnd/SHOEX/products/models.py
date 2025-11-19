@@ -59,11 +59,11 @@ class Product(models.Model):
         verbose_name="Mã sản phẩm"
     )
     slug = models.SlugField(unique=True, blank=True)
-    seller = models.ForeignKey(
-        'users.User',
+    store = models.ForeignKey(
+        'store.Store',
         on_delete=models.CASCADE,
         related_name='products',
-        verbose_name="Người bán"
+        verbose_name="Cửa hàng"
     )
     category = models.ForeignKey(
         Category,
@@ -101,6 +101,15 @@ class Product(models.Model):
         unique=True
     )
     
+    # Hướng dẫn chọn size
+    size_guide_image = models.ImageField(
+        upload_to='products/size_guides/',
+        blank=True,
+        null=True,
+        verbose_name="Ảnh hướng dẫn chọn size",
+        help_text="Upload ảnh bảng hướng dẫn chọn size cho sản phẩm"
+    )
+    
     # Metadata
     is_active = models.BooleanField(
         default=True,
@@ -110,6 +119,11 @@ class Product(models.Model):
         default=False,  
         verbose_name="Sản phẩm nổi bật"
     )
+    is_hot = models.BooleanField(
+        default=False,
+        verbose_name="Sản phẩm hot",
+        help_text="Sản phẩm bán chạy, được quan tâm nhiều"
+    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Ngày tạo"
@@ -118,13 +132,20 @@ class Product(models.Model):
         auto_now=True,
         verbose_name="Ngày cập nhật"
     )
-
+    # Many-to-many với Collection
+    collections = models.ManyToManyField(
+        'collection.Collection',
+        through='collection.ProductCollection',
+        blank=True,
+        related_name='products',
+        verbose_name="Bộ sưu tập"
+    )
     class Meta:
         verbose_name = "Sản phẩm"
         verbose_name_plural = "Sản phẩm" 
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['seller', 'is_active']),
+            models.Index(fields=['store', 'is_active']),
             models.Index(fields=['category', 'is_active']),
         ]
 
@@ -163,6 +184,8 @@ class Product(models.Model):
     def available_colors(self):
         """Các màu có sẵn"""
         return self.color_images.filter(is_available=True)
+    
+
 
 
 class ProductAttribute(models.Model):

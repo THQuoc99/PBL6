@@ -12,14 +12,20 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children, currentPage, onMenuChange, storeData }: AdminLayoutProps) {
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar */}
-      <Sidebar activeMenu={currentPage} onMenuChange={onMenuChange} />
-      
-      {/* Main Content */}
-      <div className="flex-1 ml-64">
-        <div className="p-6">
-          {children}
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <Sidebar activeMenu={currentPage} onMenuChange={onMenuChange} />
+          </div>
+          
+          {/* Main Content */}
+          <div className="lg:col-span-3">
+            <div className="space-y-6">
+              {children}
+            </div>
+          </div>
         </div>
       </div>
       

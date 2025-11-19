@@ -103,6 +103,7 @@ def get_all_data():
             hamlets = []
             if ghtk_response.get("success"):
                 hamlets = ghtk_response.get("data", [])
+                print(hamlets)
                 print(f"Found {len(hamlets)} hamlets for {province_name} - {ward_name}")
                 # Lưu vào SQLite
                 save_to_db(province_name, ward_name, hamlets)

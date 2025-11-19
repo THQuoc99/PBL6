@@ -91,19 +91,20 @@ class CategoryAdmin(admin.ModelAdmin):
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = (
-        'product_id', 'name', 'brand', 'category', 'seller', 
+        'product_id', 'name', 'brand', 'category', 'store', 
         'price_display', 'stock_display', 'variant_count', 
-        'is_featured', 'is_active', 'created_at'
+        'is_featured', 'is_hot', 'is_active', 'created_at'
     )
-    list_filter = ('is_active', 'is_featured', 'category', 'brand', 'created_at')
-    search_fields = ('name', 'brand', 'model_code', 'seller__username', 'description')
+    list_filter = ('is_active', 'is_featured', 'is_hot', 'category', 'brand', 'created_at')
+    search_fields = ('name', 'brand', 'model_code', 'store__name', 'description')
     ordering = ('-created_at',)
     list_per_page = 20
     date_hierarchy = 'created_at'
+    readonly_fields = ('size_guide_display',)
     
     fieldsets = (
         ('Thông tin cơ bản', {
-            'fields': ('seller', 'category', 'name', 'description')
+            'fields': ('store', 'category', 'name', 'description', 'size_guide_image', 'size_guide_display')
         }),
         ('Thương hiệu & Model', {
             'fields': ('brand', 'model_code'),
@@ -113,7 +114,7 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('base_price',)
         }),
         ('Cài đặt', {
-            'fields': ('is_active', 'is_featured'),
+            'fields': ('is_active', 'is_featured', 'is_hot'),
             'classes': ('collapse',)
         })
     )
@@ -142,6 +143,16 @@ class ProductAdmin(admin.ModelAdmin):
         count = obj.variants.filter(is_active=True).count()
         return f"{count} variants"
     variant_count.short_description = "Số variants"
+    
+    def size_guide_display(self, obj):
+        """Hiển thị ảnh hướng dẫn chọn size"""
+        if obj.size_guide_image:
+            return format_html(
+                '<img src="{}" style="max-height: 100px; max-width: 150px;" />',
+                obj.size_guide_image.url
+            )
+        return "Chưa có hướng dẫn"
+    size_guide_display.short_description = "Hướng dẫn size"
 
 
 @admin.register(ProductImage)

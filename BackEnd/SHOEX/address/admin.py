@@ -1,66 +1,13 @@
 from django.contrib import admin
-from .models import Province, Ward, Hamlet, Address
-
-
-@admin.register(Province)
-class ProvinceAdmin(admin.ModelAdmin):
-    list_display = ['province_id', 'name']
-    search_fields = ['name']
-    ordering = ['name']
-    
-    fieldsets = (
-        ('Thông tin cơ bản', {
-            'fields': ('province_id', 'name')
-        }),
-    )
-    
-    readonly_fields = ['province_id']
-
-
-@admin.register(Ward)
-class WardAdmin(admin.ModelAdmin):
-    list_display = ['ward_id', 'name', 'province']
-    list_filter = ['province']
-    search_fields = ['name', 'province__name']
-    autocomplete_fields = ['province']
-    ordering = ['province__name', 'name']
-    
-    fieldsets = (
-        ('Thông tin cơ bản', {
-            'fields': ('ward_id', 'province', 'name')
-        }),
-    )
-    
-    readonly_fields = ['ward_id']
-
-
-@admin.register(Hamlet)
-class HamletAdmin(admin.ModelAdmin):
-    list_display = ['hamlet_id', 'name', 'ward', 'province_name']
-    list_filter = ['ward__province', 'ward']
-    search_fields = ['name', 'ward__name', 'ward__province__name']
-    autocomplete_fields = ['ward']
-    ordering = ['ward__province__name', 'ward__name', 'name']
-    
-    def province_name(self, obj):
-        return obj.ward.province.name
-    province_name.short_description = 'Tỉnh/Thành phố'
-    
-    fieldsets = (
-        ('Thông tin cơ bản', {
-            'fields': ('hamlet_id', 'ward', 'name')
-        }),
-    )
-    
-    readonly_fields = ['hamlet_id']
+from .models import Address
 
 
 @admin.register(Address)
 class AddressAdmin(admin.ModelAdmin):
     list_display = ['address_id', 'user', 'province', 'ward', 'hamlet', 'is_default']
-    list_filter = ['province', 'ward', 'is_default']
-    search_fields = ['user__username', 'user__full_name', 'detail', 'province__name', 'ward__name']
-    autocomplete_fields = ['user', 'province', 'ward', 'hamlet']
+    list_filter = ['province', 'is_default']
+    search_fields = ['user__username', 'user__full_name', 'detail', 'province', 'ward', 'hamlet']
+    autocomplete_fields = ['user']
     readonly_fields = ['address_id', 'full_address']
     
     fieldsets = (
@@ -98,6 +45,4 @@ class AddressAdmin(admin.ModelAdmin):
         
     def get_queryset(self, request):
         """Tối ưu hóa query"""
-        return super().get_queryset(request).select_related(
-            'user', 'province', 'ward', 'hamlet', 'ward__province'
-        )
+        return super().get_queryset(request).select_related('user')

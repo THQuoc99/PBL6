@@ -1,6 +1,102 @@
 from django.db import models
+from django.contrib.auth import get_user_model
 
-# Create your models here.
+User = get_user_model()
+
+
+class Payment(models.Model):
+    """Thanh toán"""
+    
+    PAYMENT_METHOD_CHOICES = [
+        ('cod', 'Cash on Delivery'),
+        ('bank_transfer', 'Bank Transfer'),
+        ('momo', 'MoMo'),
+        ('vnpay', 'VNPay'),
+        ('zalopay', 'ZaloPay'),
+        ('paypal', 'PayPal'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
+        ('refunded', 'Refunded'),
+    ]
+    
+    payment_id = models.AutoField(
+        primary_key=True,
+        verbose_name="Mã thanh toán"
+    )
+    
+    order = models.OneToOneField(
+        'orders.Order',
+        on_delete=models.CASCADE,
+        related_name='payment',
+        verbose_name="Đơn hàng"
+    )
+    
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='payments',
+        verbose_name="Người thanh toán"
+    )
+    
+    payment_method = models.CharField(
+        max_length=20,
+        choices=PAYMENT_METHOD_CHOICES,
+        verbose_name="Phương thức thanh toán"
+    )
+    
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Số tiền"
+    )
+    
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default='pending',
+        verbose_name="Trạng thái"
+    )
+    
+    transaction_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="Mã giao dịch"
+    )
+    
+    gateway_response = models.JSONField(
+        blank=True,
+        null=True,
+        verbose_name="Phản hồi từ gateway"
+    )
+    
+    paid_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Thời gian thanh toán"
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Ngày tạo"
+    )
+    
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Ngày cập nhật"
+    )
+    
+    class Meta:
+        verbose_name = "Thanh toán"
+        verbose_name_plural = "Thanh toán"
+    
+    def __str__(self):
+        return f"Payment {self.payment_id} - {self.get_payment_method_display()}"
 
 class Payment(models.Model):
     PAYMENT_METHOD_CHOICES = [

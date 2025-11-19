@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import AuthLayout from '../../layout/AuthLayout';
 import { Eye, EyeOff, Mail, Lock, User, Phone } from 'lucide-react';
+import { authService } from '../../../services/auth';
 
 interface RegisterPageProps {
-  onRegister?: (data: RegisterData) => void;
+  onRegister?: (result: any) => void;
   onNavigateToLogin?: () => void;
 }
 
@@ -92,16 +93,50 @@ export default function RegisterPage({ onRegister, onNavigateToLogin }: Register
     }
 
     setIsLoading(true);
+    setErrors({}); // Clear previous errors
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call backend GraphQL API
+      const result = await authService.register({
+        fullName: formData.fullName,
+        username: formData.username,
+        email: formData.email,
+        password: formData.password
+      });
       
-      if (onRegister) {
-        onRegister(formData);
+      if (result.success) {
+        // Đăng ký thành công
+        if (onRegister) {
+          onRegister(result);
+        }
+      } else {
+        // Hiển thị lỗi từ backend
+        const backendErrors: Record<string, string> = {};
+        
+        if (result.errors) {
+          if (result.errors.username) {
+            backendErrors.username = result.errors.username;
+          }
+          if (result.errors.email) {
+            backendErrors.email = result.errors.email;
+          }
+          if (result.errors.password) {
+            backendErrors.password = result.errors.password;
+          }
+          if (result.errors.general) {
+            backendErrors.general = result.errors.general;
+          }
+        }
+        
+        if (Object.keys(backendErrors).length === 0) {
+          backendErrors.general = result.message || 'Đăng ký thất bại';
+        }
+        
+        setErrors(backendErrors);
       }
     } catch (error) {
       console.error('Register error:', error);
+      setErrors({ general: 'Lỗi kết nối server. Vui lòng thử lại!' });
     } finally {
       setIsLoading(false);
     }
@@ -113,6 +148,22 @@ export default function RegisterPage({ onRegister, onNavigateToLogin }: Register
       subtitle="Tạo tài khoản mới để bắt đầu mua sắm"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* General Error Message */}
+        {errors.general && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">
+                  Lỗi đăng ký
+                </h3>
+                <div className="mt-2 text-sm text-red-700">
+                  {errors.general}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Full Name Field */}
         <div>
           <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Voucher, VoucherProduct, VoucherCategory, 
-    VoucherSeller, UserVoucher, OrderVoucher
+    VoucherStore, UserVoucher, OrderVoucher
 )
 
 
@@ -54,12 +54,12 @@ class VoucherCategoryAdmin(admin.ModelAdmin):
     raw_id_fields = ['voucher', 'category']
 
 
-@admin.register(VoucherSeller)
-class VoucherSellerAdmin(admin.ModelAdmin):
-    list_display = ['voucher', 'seller', 'created_at']
+@admin.register(VoucherStore)
+class VoucherStoreAdmin(admin.ModelAdmin):
+    list_display = ['voucher', 'store', 'created_at']
     list_filter = ['created_at']
-    search_fields = ['voucher__code', 'seller__username']
-    raw_id_fields = ['voucher', 'seller']
+    search_fields = ['voucher__code', 'store__name']
+    raw_id_fields = ['voucher', 'store']
 
 
 @admin.register(UserVoucher)

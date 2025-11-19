@@ -1,5 +1,7 @@
-import React from 'react';
-import { Search, User, Heart, ShoppingCart, Menu, Tag, Phone, Store } from 'lucide-react';
+import React, { useState } from 'react';
+import { Search, Menu, X, Heart, ShoppingCart, User, Home, Package, Store, Tag, Truck, Star, LogOut, Phone } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+import { authService } from '../../services/auth';
 
 interface CustomerLayoutProps {
   children: React.ReactNode;
@@ -8,7 +10,14 @@ interface CustomerLayoutProps {
 }
 
 export default function CustomerLayout({ children, currentPage, onNavigate }: CustomerLayoutProps) {
-  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const { isAuthenticated, user } = useAuth();
+
+  const handleLogout = () => {
+    authService.logout();
+    onNavigate?.('login');
+  };
 
   const navigationItems = [
     { icon: Tag, label: 'Khuyến mãi', href: '/customer/promotions', value: 'promotions' },
@@ -35,11 +44,10 @@ export default function CustomerLayout({ children, currentPage, onNavigate }: Cu
                 <button
                   key={item.value}
                   onClick={() => onNavigate?.(item.value)}
-                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    currentPage === item.value
+                  className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${currentPage === item.value
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   <item.icon className="h-4 w-4" />
                   <span>{item.label}</span>
@@ -63,7 +71,7 @@ export default function CustomerLayout({ children, currentPage, onNavigate }: Cu
 
             {/* User actions */}
             <div className="flex items-center space-x-3">
-              <button 
+              <button
                 onClick={() => onNavigate?.('wishlist')}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md relative"
               >
@@ -72,8 +80,8 @@ export default function CustomerLayout({ children, currentPage, onNavigate }: Cu
                   2
                 </span>
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => onNavigate?.('cart')}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md relative"
               >
@@ -83,13 +91,65 @@ export default function CustomerLayout({ children, currentPage, onNavigate }: Cu
                 </span>
               </button>
 
-              <button 
-                onClick={() => onNavigate?.('account')}
-                className="flex items-center space-x-2 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
-              >
-                <User className="h-6 w-6" />
-                <span className="hidden sm:block text-sm">Tài khoản</span>
-              </button>
+              {isAuthenticated && user ? (
+                // User is logged in - Show user info with dropdown
+                <div className="relative">
+                  <button
+                    onClick={() => onNavigate?.('account')}
+                    onMouseEnter={() => setShowUserDropdown(true)}
+                    onMouseLeave={() => setShowUserDropdown(false)}
+                    className="flex items-center space-x-2 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-medium">
+                      {user.fullName?.charAt(0) || user.username?.charAt(0) || 'U'}
+                    </div>
+                    <div className="text-left hidden sm:block">
+                      <div className="text-sm font-medium">{user.fullName || user.username}</div>
+                      <div className="text-xs text-gray-500 uppercase">{user.role}</div>
+                    </div>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {showUserDropdown && (
+                    <div
+                      className="absolute right-0 top-full mt-0.1 w-48 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50"
+                      onMouseEnter={() => setShowUserDropdown(true)}
+                      onMouseLeave={() => setShowUserDropdown(false)}
+                    >
+                      <button
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          onNavigate?.('account');
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                      >
+                        <User className="h-4 w-4" />
+                        <span>Tài khoản của tôi</span>
+                      </button>
+                      <hr className="my-1" />
+                      <button
+                        onClick={() => {
+                          setShowUserDropdown(false);
+                          handleLogout();
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        <span>Đăng xuất</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // User is not logged in
+                <button
+                  onClick={() => onNavigate?.('account')}
+                  className="flex items-center space-x-2 p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md"
+                >
+                  <User className="h-6 w-6" />
+                  <span className="hidden sm:block text-sm">Tài khoản</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -102,17 +162,16 @@ export default function CustomerLayout({ children, currentPage, onNavigate }: Cu
                 <button
                   key={item.value}
                   onClick={() => onNavigate?.(item.value)}
-                  className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium ${
-                    currentPage === item.value
+                  className={`w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium ${currentPage === item.value
                       ? 'text-blue-600 bg-blue-50'
                       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   <item.icon className="h-5 w-5" />
                   <span>{item.label}</span>
                 </button>
               ))}
-              
+
               {/* Mobile Search */}
               <div className="pt-4">
                 <div className="relative">
@@ -149,7 +208,7 @@ export default function CustomerLayout({ children, currentPage, onNavigate }: Cu
                 Cửa hàng giày dép uy tín, chất lượng cao với nhiều mẫu mã đa dạng.
               </p>
             </div>
-            
+
             <div>
               <h3 className="font-semibold mb-4">Sản phẩm</h3>
               <ul className="space-y-2 text-gray-400">
@@ -159,7 +218,7 @@ export default function CustomerLayout({ children, currentPage, onNavigate }: Cu
                 <li><a href="#" className="hover:text-white">Phụ kiện</a></li>
               </ul>
             </div>
-            
+
             <div>
               <h3 className="font-semibold mb-4">Hỗ trợ</h3>
               <ul className="space-y-2 text-gray-400">
@@ -169,7 +228,7 @@ export default function CustomerLayout({ children, currentPage, onNavigate }: Cu
                 <li><a href="#" className="hover:text-white">Liên hệ</a></li>
               </ul>
             </div>
-            
+
             <div>
               <h3 className="font-semibold mb-4">Liên hệ</h3>
               <ul className="space-y-2 text-gray-400">
@@ -179,7 +238,7 @@ export default function CustomerLayout({ children, currentPage, onNavigate }: Cu
               </ul>
             </div>
           </div>
-          
+
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
             <p>&copy; 2024 SHOEX. All rights reserved.</p>
           </div>

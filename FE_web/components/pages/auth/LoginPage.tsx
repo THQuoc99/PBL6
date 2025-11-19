@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import AuthLayout from '../../layout/AuthLayout';
 import { Eye, EyeOff, User, Lock } from 'lucide-react';
+import { authService } from '../../../services/auth';
 
 interface LoginPageProps {
-  onLogin?: (username: string, password: string) => void;
+  onLogin?: (result: any) => void;
   onNavigateToRegister?: () => void;
   onNavigateToForgot?: () => void;
   onGoogleLogin?: () => void;
@@ -54,16 +55,42 @@ export default function LoginPage({ onLogin, onNavigateToRegister, onNavigateToF
     }
 
     setIsLoading(true);
+    setErrors({}); // Clear previous errors
     
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Call backend GraphQL API
+      const result = await authService.login(formData.username, formData.password);
       
-      if (onLogin) {
-        onLogin(formData.username, formData.password);
+      if (result.success) {
+        // Đăng nhập thành công
+        if (onLogin) {
+          onLogin(result);
+        }
+      } else {
+        // Hiển thị lỗi từ backend
+        const backendErrors: Record<string, string> = {};
+        
+        if (result.errors) {
+          if (result.errors.username) {
+            backendErrors.username = result.errors.username;
+          }
+          if (result.errors.password) {
+            backendErrors.password = result.errors.password;
+          }
+          if (result.errors.general) {
+            backendErrors.general = result.errors.general;
+          }
+        }
+        
+        if (Object.keys(backendErrors).length === 0) {
+          backendErrors.general = result.message || 'Đăng nhập thất bại';
+        }
+        
+        setErrors(backendErrors);
       }
     } catch (error) {
       console.error('Login error:', error);
+      setErrors({ general: 'Lỗi kết nối server. Vui lòng thử lại!' });
     } finally {
       setIsLoading(false);
     }
@@ -75,6 +102,22 @@ export default function LoginPage({ onLogin, onNavigateToRegister, onNavigateToF
       subtitle="Chào mừng bạn quay trở lại!"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* General Error Message */}
+        {errors.general && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">
+                  Lỗi đăng nhập
+                </h3>
+                <div className="mt-2 text-sm text-red-700">
+                  {errors.general}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Google Login Button */}
         <button
           type="button"

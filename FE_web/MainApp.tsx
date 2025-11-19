@@ -16,6 +16,7 @@ import {
   CustomerCartPage,
   CustomerWishlistPage,
   CustomerAccountPage,
+  CollectionsPage,
   AdminLayout,
   SellerProductsPage,
   OrdersPage,
@@ -40,13 +41,14 @@ import {
   BarChart3
 } from 'lucide-react';
 
-type AppPage = 'login' | 'register' | 'forgot-password' | 'customer-home' | 'customer-products' | 'customer-product-detail' | 'customer-store' | 'customer-payment' | 'customer-promotions' | 'customer-contact' | 'customer-cart' | 'customer-wishlist' | 'customer-account' | 'seller-login' | 'seller-register' | 'seller-dashboard';
+type AppPage = 'login' | 'register' | 'forgot-password' | 'customer-home' | 'customer-products' | 'customer-product-detail' | 'customer-store' | 'customer-payment' | 'customer-promotions' | 'customer-contact' | 'customer-cart' | 'customer-wishlist' | 'customer-account' | 'collections' | 'seller-login' | 'seller-register' | 'seller-dashboard';
 
 interface MainAppProps {
   initialPage?: AppPage;
+  onNavigate?: (page: AppPage) => void;  // ← Thêm callback
 }
 
-export default function MainApp({ initialPage = 'customer-home' }: MainAppProps) {
+export default function MainApp({ initialPage = 'customer-home', onNavigate }: MainAppProps) {
   const [currentAppPage, setCurrentAppPage] = useState<AppPage>(initialPage);
   const [currentSellerPage, setCurrentSellerPage] = useState<MenuItems>('dashboard');
   
@@ -121,9 +123,11 @@ export default function MainApp({ initialPage = 'customer-home' }: MainAppProps)
   };
 
   // Event handlers
-  const handleLogin = (email: string, password: string) => {
-    console.log('Login:', { email, password });
-    setCurrentAppPage('seller-dashboard');
+  const handleLogin = (result: any) => {
+    console.log('Login:', result);
+    if (result.success) {
+      setCurrentAppPage('seller-dashboard');
+    }
   };
 
   const handleRegister = (data: any) => {
@@ -188,8 +192,16 @@ export default function MainApp({ initialPage = 'customer-home' }: MainAppProps)
       case 'account':
         setCurrentAppPage('customer-account');
         break;
+      case 'collections':
+        setCurrentAppPage('collections');
+        break;
       case 'login':
-        setCurrentAppPage('login');
+        // Thông báo lên AppRouter để sync state
+        onNavigate?.('login');
+        break;
+      case 'register':
+        // Thông báo lên AppRouter để sync state
+        onNavigate?.('register');
         break;
       case 'seller-login':
         setCurrentAppPage('seller-login');
@@ -380,6 +392,9 @@ export default function MainApp({ initialPage = 'customer-home' }: MainAppProps)
 
     case 'customer-account':
       return <CustomerAccountPage onNavigate={handleCustomerNavigate} />;
+
+    case 'collections':
+      return <CollectionsPage onNavigate={handleCustomerNavigate} />;
 
     case 'seller-login':
       return (

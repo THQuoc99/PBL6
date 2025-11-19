@@ -1,0 +1,299 @@
+"""
+Test GraphQL Queries cho User Authentication - USER MODULE ONLY
+
+Các queries và mutations này có thể test trong GraphiQL interface tại:
+http://localhost:8000/graphql/
+
+FOCUS: Phát triển và test User module trước, các module khác sẽ develop sau
+
+USER MODEL FIELDS:
+- AbstractUser fields: id, username, email, first_name, last_name, is_active, date_joined, etc.
+- Custom fields: full_name, phone, role, created_at
+
+=== HEALTH CHECK ===
+query {
+  health
+}
+
+=== TEST REGISTER (Role mặc định = buyer) ===
+mutation {
+  register(input: {
+    fullName: "Nguyễn Văn A"
+    username: "testuser"
+    email: "test@example.com"
+    password: "testpassword123"
+  }) {
+    success
+    message
+    user {
+      id
+      username
+      email
+      fullName
+      firstName
+      lastName
+      phone
+      role
+      roleDisplay
+      displayName
+      initials
+      isActive
+      dateJoined
+      createdAt
+    }
+    errors {
+      username
+      email
+      password
+      general
+    }
+  }
+}
+
+=== TEST LOGIN ===
+mutation {
+  login(input: {
+    username: "testuser"
+    password: "testpassword123"
+    rememberMe: false
+  }) {
+    success
+    message
+    user {
+      id
+      username
+      email
+      fullName
+      firstName
+      lastName
+      phone
+      role
+      roleDisplay
+      displayName
+      initials
+      isSeller
+      isCustomer
+      isActive
+      dateJoined
+      createdAt
+    }
+    tokens {
+      accessToken
+      refreshToken
+      expiresIn
+    }
+    errors {
+      username
+      password
+      general
+    }
+  }
+}
+
+=== TEST LOGOUT ===
+mutation {
+  logout {
+    success
+    message
+  }
+}
+
+=== TEST LOGIN WITH WRONG PASSWORD ===
+mutation {
+  login(input: {
+    username: "testuser"
+    password: "wrongpassword"
+  }) {
+    success
+    message
+    user {
+      id
+      username
+    }
+    errors {
+      username
+      password
+      general
+    }
+  }
+}
+
+=== TEST LOGIN WITH NON-EXISTING USER ===
+mutation {
+  login(input: {
+    username: "nonexistuser"
+    password: "anypassword"
+  }) {
+    success
+    message
+    errors {
+      username
+      password
+      general
+    }
+  }
+}
+
+=== QUERY ALL USERS (Admin only) ===
+query {
+  users {
+    id
+    username
+    email
+    fullName
+    role
+    roleDisplay
+    displayName
+    isActive
+    dateJoined
+    createdAt
+  }
+}
+
+=== QUERY CURRENT USER ===
+query {
+  me {
+    user {
+      id
+      username
+      email
+      fullName
+      role
+      roleDisplay
+      displayName
+      phone
+      isActive
+      dateJoined
+      createdAt
+    }
+  }
+}
+
+=== USER CREATE (Admin only) ===
+mutation {
+  userCreate(input: {
+    username: "newuser"
+    email: "new@example.com"
+    password: "newpassword123"
+    fullName: "New User"
+    role: "seller"
+  }) {
+    success
+    user {
+      id
+      username
+      email
+      fullName
+      role
+      isActive
+    }
+    errors
+  }
+}
+
+=== USER UPDATE ===
+mutation {
+  userUpdate(id: "1", input: {
+    fullName: "Updated Name"
+    phone: "0123456789"
+  }) {
+    success
+    user {
+      id
+      username
+      fullName
+      phone
+    }
+    errors
+  }
+}
+
+=== PASSWORD CHANGE ===
+mutation {
+  passwordChange(input: {
+    oldPassword: "oldpass123"
+    newPassword: "newpass123"
+  }) {
+    success
+    errors
+  }
+}
+
+AVAILABLE ROLES:
+- buyer (default): Khách hàng
+- seller: Người bán 
+- admin: Quản trị viên
+"""
+
+=== TEST LOGOUT ===
+mutation {
+  logout {
+    success
+    message
+  }
+}
+
+=== TEST LOGIN WITH WRONG PASSWORD ===
+mutation {
+  login(input: {
+    username: "testuser"
+    password: "wrongpassword"
+  }) {
+    success
+    message
+    user {
+      id
+      username
+    }
+    errors {
+      username
+      password
+      general
+    }
+  }
+}
+
+=== TEST LOGIN WITH NON-EXISTING USER ===
+mutation {
+  login(input: {
+    username: "nonexistuser"
+    password: "anypassword"
+  }) {
+    success
+    message
+    errors {
+      username
+      password
+      general
+    }
+  }
+}
+
+=== QUERY ALL USERS (Admin only) ===
+query {
+  users {
+    id
+    username
+    email
+    fullName
+    role
+    isActive
+    createdAt
+  }
+}
+
+=== QUERY CURRENT USER ===
+query {
+  me {
+    user {
+      id
+      username
+      email
+      fullName
+      role
+      isActive
+      createdAt
+    }
+  }
+}
+"""

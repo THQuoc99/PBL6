@@ -18,6 +18,7 @@ export { default as CustomerProductDetailPage } from './pages/customer/ProductDe
 export { default as CustomerStorePage } from './pages/customer/StorePage';
 export { default as CustomerPaymentPage } from './pages/customer/PaymentPage';
 export { default as CustomerPromotionsPage } from './pages/customer/PromotionsPage';
+export { default as CollectionsPage } from './pages/customer/CollectionsPage';
 export { default as CustomerContactPage } from './pages/customer/ContactPage';
 export { default as CustomerCartPage } from './pages/customer/CartPage';
 export { default as CustomerWishlistPage } from './pages/customer/WishlistPage';

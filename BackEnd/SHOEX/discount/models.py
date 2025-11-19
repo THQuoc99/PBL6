@@ -35,13 +35,13 @@ class Voucher(models.Model):
         help_text="Platform voucher hoặc seller voucher"
     )
     seller = models.ForeignKey(
-        'users.User',
+        'store.Store',
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name='vouchers',
-        verbose_name="Người bán",
-        help_text="Người bán sở hữu voucher (NULL nếu là platform voucher)"
+        verbose_name="Cửa hàng",
+        help_text="Cửa hàng sở hữu voucher (NULL nếu là platform voucher)"
     )
     discount_type = models.CharField(
         max_length=10,
@@ -313,3 +313,39 @@ class OrderVoucher(models.Model):
 
     def __str__(self):
         return f"Order {self.order.order_id} - {self.voucher.code} (-{self.discount_amount})"
+
+
+class VoucherStore(models.Model):
+    """Voucher cho cửa hàng"""
+    
+    voucher = models.ForeignKey(
+        Voucher,
+        on_delete=models.CASCADE,
+        related_name='voucher_stores',
+        verbose_name="Voucher"
+    )
+    
+    store = models.ForeignKey(
+        'store.Store',
+        on_delete=models.CASCADE,
+        related_name='applicable_vouchers',
+        verbose_name="Cửa hàng"
+    )
+    
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Ngày tạo"
+    )
+    
+    class Meta:
+        verbose_name = "Voucher cho cửa hàng"
+        verbose_name_plural = "Voucher cho cửa hàng"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['voucher', 'store'],
+                name='unique_voucher_store'
+            ),
+        ]
+    
+    def __str__(self):
+        return f"{self.voucher.code} - {self.store.name}"
