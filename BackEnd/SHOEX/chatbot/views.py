@@ -75,9 +75,8 @@ Danh mục: """
                 "Content-Type": "application/json"
             },
             json={
-                "model": "mistralai/mistral-7b-instruct:free", # Dùng model nhanh để phân loại
+                "model": "google/gemini-2.0-flash-001", # Dùng model nhanh để phân loại
                 "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": 20 # Tăng nhẹ token
             }
         )
         response.raise_for_status()
@@ -298,7 +297,7 @@ Hãy viết câu trả lời cho khách hàng:
                 "Content-Type": "application/json"
             },
             json={
-                "model": "mistralai/mistral-7b-instruct:free", 
+                "model": "google/gemini-2.0-flash-001", 
                 "messages": [
                     {"role": "user", "content": prompt_template}
                 ]
@@ -334,6 +333,8 @@ def chat_with_gpt(request):
     # - Nếu Flutter KHÔNG GỬI token -> request.user là <AnonymousUser>
     
     try:
+        data = json.loads(request.body.decode("utf-8"))
+        message = data.get("message", "").strip().lower()
         data = json.loads(request.body.decode("utf-8"))
         message = data.get("message", "").strip().lower()
 

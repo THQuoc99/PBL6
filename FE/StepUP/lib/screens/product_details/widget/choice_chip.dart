@@ -1,31 +1,62 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/constants/image_string.dart';
+import 'package:flutter_app/constants/colors.dart';
 
 class MyChoiceChip extends StatelessWidget {
+  final String text;
   final bool selected;
   final void Function(bool)? onSelected;
-  final String label;
-  final String imagePath;
+
   const MyChoiceChip({
     super.key,
-    this.selected = false,
+    required this.text,
+    required this.selected,
     this.onSelected,
-    this.label = 'Red Nike Shoes',
-    this.imagePath = AppImages.sabrinaRed,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ChoiceChip(
-      label: label.isNotEmpty ? Text(label) : const SizedBox.shrink(),
-      selected: selected,
-      onSelected: onSelected,
-      avatar: CircleAvatar(
-        backgroundImage: AssetImage(AppImages.sabrinaRed),
+    // Helper lấy màu từ tên (Bạn có thể mở rộng thêm các màu tiếng Việt)
+    final color = _getColor(text);
+    final isColor = color != null;
+
+    return Theme(
+      data: Theme.of(context).copyWith(canvasColor: Colors.transparent),
+      child: ChoiceChip(
+        // Nếu là màu -> Ẩn chữ, hiện vòng tròn màu
+        label: isColor ? const SizedBox() : Text(text),
+        selected: selected,
+        onSelected: onSelected,
+        
+        labelStyle: TextStyle(color: selected ? Colors.white : null),
+        
+        avatar: isColor 
+          ? CircleAvatar(backgroundColor: color) 
+          : null,
+        
+        labelPadding: isColor ? const EdgeInsets.all(0) : null,
+        padding: isColor ? const EdgeInsets.all(0) : const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        
+        // Màu nền khi được chọn
+        selectedColor: AppColors.primary,
+        backgroundColor: isColor ? color : null,
+        shape: isColor ? const CircleBorder() : null,
       ),
-      
-      selectedColor: Colors.blue.withAlpha((255 * 0.2).round()), 
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
     );
+  }
+
+  Color? _getColor(String value) {
+    // Hỗ trợ cả tiếng Anh và tiếng Việt (theo DB của bạn)
+    switch (value.toLowerCase()) {
+      case 'green': case 'xanh lá': return Colors.green;
+      case 'blue': case 'xanh dương': return Colors.blue;
+      case 'red': case 'đỏ': return Colors.red;
+      case 'yellow': case 'vàng': return Colors.yellow;
+      case 'black': case 'đen': return Colors.black;
+      case 'white': case 'trắng': return Colors.white;
+      case 'grey': case 'xám': return Colors.grey;
+      case 'purple': case 'tím': return Colors.purple;
+      case 'pink': case 'hồng': return Colors.pink;
+      default: return null;
+    }
   }
 }

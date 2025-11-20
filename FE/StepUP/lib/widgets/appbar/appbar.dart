@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/constants/colors.dart';
 import 'package:flutter_app/constants/sizes.dart';
 import 'package:flutter_app/utils/helpers/helper_function.dart';
-import 'package:get/route_manager.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 
 class CusAppbar extends StatelessWidget implements PreferredSizeWidget {
@@ -18,7 +17,7 @@ class CusAppbar extends StatelessWidget implements PreferredSizeWidget {
     this.actions,
     this.showBackArrow = false,
     this.leadingOnPressed,
-    this.leadingIcon //= Icons.arrow_back, // mặc định là arrow_back
+    this.leadingIcon,
   });
 
   @override
@@ -31,8 +30,11 @@ class CusAppbar extends StatelessWidget implements PreferredSizeWidget {
         automaticallyImplyLeading: false,
         leading: showBackArrow
             ? IconButton(
-                onPressed: () => Get.back(),
-                icon: Icon(Iconsax.arrow_left, color: dark ? AppColors.white : AppColors.dark,),
+                onPressed: () => Navigator.of(context).pop(), 
+                icon: Icon(
+                  Iconsax.arrow_left,
+                  color: dark ? AppColors.white : AppColors.dark,
+                ),
               )
             : leadingIcon != null
                 ? IconButton(

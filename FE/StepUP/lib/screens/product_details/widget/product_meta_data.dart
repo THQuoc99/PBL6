@@ -9,19 +9,26 @@ import 'package:flutter_app/widgets/products/brands/brand_titles.dart';
 import 'package:flutter_app/widgets/texts/product_price_text.dart';
 import 'package:flutter_app/widgets/texts/product_title_text.dart';
 import 'package:get/get.dart';
+import 'package:flutter_app/shop/models/product_model.dart';
 
+class ProductMetaData extends StatelessWidget {
+  final ProductModel product;
 
-class ProductMetaData extends StatelessWidget{
   const ProductMetaData({
-    super.key
+    super.key,
+    required this.product,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Tính giá gốc giả định (để hiển thị giảm giá)
+    // Ví dụ: Giá gốc cao hơn 20% so với giá bán
+    final originalPrice = product.price * 1.2;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Price
+        // Price & Sale Tag
         Row(
           children: [
             // Sale tag
@@ -29,45 +36,61 @@ class ProductMetaData extends StatelessWidget{
               radius: AppSizes.sm,
               bgcolor: AppColors.secondary,
               padding: const EdgeInsets.symmetric(horizontal: AppSizes.sm, vertical: AppSizes.xs),
-              child: Text('90%', style: Theme.of(context).textTheme.labelLarge!.apply(color: Colors.black),),
+              child: Text(
+                '20%', // Tạm thời để tĩnh hoặc tính toán dựa trên giá gốc/giá bán
+                style: Theme.of(context).textTheme.labelLarge!.apply(color: Colors.black),
+              ),
             ),
-            SizedBox(width: AppSizes.spaceBtwItems,),
-            // Price
-            Text('\$10000', style: Theme.of(context).textTheme.titleSmall!.apply(decoration: TextDecoration.lineThrough),),
-            SizedBox(width: AppSizes.spaceBtwItems,),
-            ProductPriceText(price: '100', isLarge: true,),
+            const SizedBox(width: AppSizes.spaceBtwItems),
+            
+            // Original Price (Gạch ngang)
+            Text(
+              '\$${originalPrice.toStringAsFixed(0)}', 
+              style: Theme.of(context).textTheme.titleSmall!.apply(decoration: TextDecoration.lineThrough),
+            ),
+            const SizedBox(width: AppSizes.spaceBtwItems),
+            
+            // ✅ Current Price (Giá thật từ API)
+            ProductPriceText(
+              price: product.price.toStringAsFixed(0), 
+              isLarge: true,
+            ),
           ],
         ),
-        SizedBox(width: AppSizes.spaceBtwItems / 1.5 ),
-        // Title
-        ProductTitleText(title: 'Sabrina 3 Blueprint'),
-        SizedBox(width: AppSizes.spaceBtwItems / 1.5 ),
-        // Stock
+        
+        const SizedBox(height: AppSizes.spaceBtwItems / 1.5),
+        
+        // ✅ Title (Tên thật từ API)
+        ProductTitleText(title: product.name),
+        
+        const SizedBox(height: AppSizes.spaceBtwItems / 1.5),
+        
+        // Stock Status
         Row(
           children: [
-            ProductTitleText(title: 'Status'),
-            SizedBox(width: AppSizes.spaceBtwItems),
+            const ProductTitleText(title: 'Status'),
+            const SizedBox(width: AppSizes.spaceBtwItems),
             Text('In Stock', style: Theme.of(context).textTheme.titleMedium),
           ],
         ),
         
-        SizedBox(width: AppSizes.spaceBtwItems / 1.5 ),
-        // Brand
+        const SizedBox(height: AppSizes.spaceBtwItems / 1.5),
+        
+        // Brand (Tạm thời để Nike hoặc lấy từ product.brand nếu có)
         InkWell(
           onTap: () => Get.to(() => const StoreScreen()),
           child: Row(
             children: [
               CircularImage(
-                image: AppImages.nike,
+                image: AppImages.nike, // Icon brand mặc định
                 width: 32,
                 height: 32,
-                overlayColor: Colors.white,
+                overlayColor: Colors.blue, // Đổi màu icon cho rõ trên nền sáng
               ),
-              BrandTitlesVerify(title: 'Nike')
+              const BrandTitlesVerify(title: 'Shoex Official'),
             ],
           ),
         ),
-        
       ],
     );
   }

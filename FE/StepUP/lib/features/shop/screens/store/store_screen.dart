@@ -10,6 +10,7 @@ import 'package:flutter_app/widgets/products/product_cards/product_card_vertical
 import 'package:flutter_app/widgets/products/brands/brand_titles.dart';
 import 'package:flutter_app/utils/helpers/helper_function.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:flutter_app/shop/services/product_service.dart';
 
 class StoreScreen extends StatelessWidget {
   const StoreScreen({super.key});
@@ -149,7 +150,18 @@ class StoreProductsTab extends StatelessWidget {
               const SizedBox(height: AppSizes.spaceBtwItems,),
 
               //Product
-              GridLayout(itemCount: 8, itemBuilder: (_,index) => ProductCardVertical()),
+              // Use featured products as placeholder for store products
+              FutureBuilder(
+                future: ProductService.getFeaturedProducts(first: 12),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
+                  }
+                  final products = snapshot.data ?? [];
+                  if (products.isEmpty) return const Text('Không có sản phẩm');
+                  return GridLayout(itemCount: products.length, itemBuilder: (_, index) => ProductCardVertical(product: products[index]));
+                },
+              ),
             ],
           ),
         ),

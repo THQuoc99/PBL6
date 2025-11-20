@@ -11,83 +11,91 @@ import 'package:flutter_app/constants/image_string.dart';
 import 'package:flutter_app/widgets/layouts/grid_layout.dart';
 import 'package:flutter_app/widgets/products/product_cards/product_card_vertical.dart';
 import 'package:get/get.dart';
-//import 'package:flutter_app/widgets/appbar/appbar.dart';
+import 'package:flutter_app/shop/controllers/home_controller.dart';
+
 class HomeScreen extends StatelessWidget {
-  //final bool showBackArrow;
-  const HomeScreen({
-    super.key,
-    //this.showBackArrow = false
-    });
+  const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    //Size size = MediaQuery.of(context).size;
+    final controller = Get.put(HomeController());
+
     return Scaffold(
       body: SingleChildScrollView(
         child: Column(
           children: [
+            // --- HEADER ---
             PrimaryHeaderContainer(
               child: Column(
                 children: [
-                  //AppBarWidget(),
-                  HomeAppBar(),
-                  SizedBox(height: 24),
-
-                  // Search Container
-                  SearchContainer(hintText: "Search your favorite",),
-                  SizedBox(height: 24),
+                  const HomeAppBar(),
+                  const SizedBox(height: 24),
+                  const SearchContainer(hintText: "Search your favorite"),
+                  const SizedBox(height: 24),
 
                   // Categories
-                  Padding(
-                    padding: const EdgeInsets.only(left: 20),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 20),
                     child: Column(
                       children: [
-
-                        // Heading
-                        SectionHeading(title: "Popular Categories", showActionButton: false,),
+                        SectionHeading(title: "Popular Categories", showActionButton: false),
                         SizedBox(height: 16),
-                        // Categories List
-                        HomeCategory(),                     
-                      
+                        HomeCategory(), 
                       ],
                     ),
-                    )
+                  ),
+                  const SizedBox(height: 32),
                 ],
-              )
+              ),
             ),
-            // Body 
+
+            // --- BODY ---
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
                   // Promo slider
-                  const PromoSlider(banners: [AppImages.banner1,AppImages.banner2,AppImages.banner3],),
+                  const PromoSlider(banners: [
+                    AppImages.banner1,
+                    AppImages.banner2,
+                    AppImages.banner3
+                  ]),
                   const SizedBox(height: 30),
 
-                  SectionHeading(title: 'Popular Product', onButtonPressed: () => Get.to(()=> const AllProducts(),)),
-                  //Popular product
-                  GridLayout(itemCount: 4, itemBuilder: (_,index)=> const ProductCardVertical(),),
-                  
+                  // Heading Sản Phẩm
+                  SectionHeading(
+                    title: 'Popular Product',
+                    onButtonPressed: () => Get.to(() => const AllProducts()),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Obx(() {
+                    // 1. Đang tải
+                    if (controller.isLoading.value) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    
+                    // 2. Không có dữ liệu
+                    if (controller.productList.isEmpty) {
+                      return const Center(child: Text('Không có sản phẩm nào từ Server'));
+                    }
+
+                    // 3. Có dữ liệu -> Hiển thị Grid
+                    return GridLayout(
+                      itemCount: controller.productList.length,
+                      itemBuilder: (_, index) {
+                        // Truyền product model vào card
+                        return ProductCardVertical(product: controller.productList[index]);
+                      },
+                    );
+                  }),
                 ],
-              ),            
+              ),
             ),
-            SizedBox(height: AppSizes.spaceBtwSections,)
+            const SizedBox(height: AppSizes.spaceBtwSections),
           ],
         ),
-      )
+      ),
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

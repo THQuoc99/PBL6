@@ -14,7 +14,7 @@ class ProductReviewScreen extends StatelessWidget {
     Widget build(BuildContext context){
         return Scaffold(
             // AppBar
-            appBar: CusAppbar(title: Text('Review and Rating'),),
+            appBar: CusAppbar(title: Text('Review and Rating'), showBackArrow: true,),
 
             // Body
             body: SingleChildScrollView(

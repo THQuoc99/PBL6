@@ -1,142 +1,173 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/constants/image_string.dart';
+import 'package:get/get.dart';
+import 'package:flutter_app/constants/sizes.dart';
+import 'package:flutter_app/constants/colors.dart';
+import 'package:flutter_app/shop/models/product_model.dart';
+import 'package:flutter_app/shop/controllers/cart_controller.dart';
+import 'package:flutter_app/shop/controllers/product_variation_controller.dart';
+import 'package:flutter_app/widgets/containers/rounded_container.dart';
+import 'package:flutter_app/screens/product_details/widget/choice_chip.dart'; 
 
-// 
 enum SheetMode { addToCart, buyNow }
 
-class ProductVariationSheet extends StatefulWidget {
+class ProductVariationSheet extends StatelessWidget {
+  final ProductModel product;
   final SheetMode mode;
+
   const ProductVariationSheet({
     super.key,
+    required this.product,
     required this.mode,
   });
 
   @override
-  State<ProductVariationSheet> createState() => _ProductVariationSheetState();
-}
-
-class _ProductVariationSheetState extends State<ProductVariationSheet> {
-  // Biến để lưu trữ lựa chọn hiện tại
-  String? _selectedColor;
-
-  // Dữ liệu mẫu (bạn sẽ thay bằng dữ liệu thật)
-  final List<Map<String, String>> variations = [
-    {'name': 'F75 Xanh den', 'image': 'assets/images/blue.png'},
-    {'name': 'F75 X-Đ silent', 'image': 'assets/images/black.png'},
-    {'name': 'F75 xanh navy', 'image': 'assets/images/navy.png'},
-    {'name': 'AU75 tím đỏ', 'image': 'assets/images/purple.png'},
-    {'name': 'F75 Vàng Đen leobog', 'image': 'assets/images/yellow_black.png'},
-    {'name': 'F75 white lines', 'image': 'assets/images/white.png'},
-  ];
-
-  @override
   Widget build(BuildContext context) {
-    final String title = widget.mode == SheetMode.addToCart ? "Add to Cart" : "Buy Now";
-    // Dùng Padding để tạo khoảng trống xung quanh nội dung
+    final controller = Get.put(VariationController());
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.reset());
+
+    final availableAttributes = controller.getAvailableAttributes(product);
+
+    // Xử lý ảnh
+    String imageUrl = product.image ?? "";
+    if (imageUrl.startsWith("/media")) {
+      imageUrl = "http://10.0.2.2:8000$imageUrl";
+    }
+
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(AppSizes.defaultSpace),
       child: Column(
-        mainAxisSize: MainAxisSize.min, // Để sheet tự co lại theo nội dung
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. Phần thông tin sản phẩm (Ảnh, Giá, Kho)
+          // --- 1. Header: Ảnh + Tên + Giá + SKU ---
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Giả lập ảnh sản phẩm được chọn
-              Image.asset(AppImages.sabrina, width: 100, height: 100, fit: BoxFit.cover),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "976.800đ",
-                    style: TextStyle(color: Colors.red, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 4),
-                  Text("Kho: 104", style: TextStyle(color: Colors.grey)),
-                ],
+              // Ảnh sản phẩm
+              RoundedContainer(
+                height: 80,
+                width: 80,
+                padding: const EdgeInsets.all(AppSizes.sm),
+                bgcolor: AppColors.light,
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.image),
+                ),
+              ),
+              const SizedBox(width: AppSizes.spaceBtwItems),
+
+              // Thông tin bên phải ảnh
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Tên sản phẩm
+                    Text(
+                      product.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Giá (Thay đổi khi chọn variant)
+                    Obx(() {
+                      final price = controller.selectedVariant.value?.price ?? product.price;
+                      return Text(
+                        '\$${price.toStringAsFixed(0)}',
+                        style: Theme.of(context).textTheme.headlineSmall!.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold
+                        ),
+                      );
+                    }),
+
+                    // Trạng thái kho / SKU
+                    Obx(() {
+                      final variant = controller.selectedVariant.value;
+                      if (variant != null) {
+                        return Text("SKU: ${variant.sku} (Kho: ${variant.stock})", 
+                          style: Theme.of(context).textTheme.labelMedium);
+                      }
+                      return const Text("Vui lòng chọn phân loại", 
+                          style: TextStyle(color: Colors.grey));
+                    }),
+                  ],
+                ),
               )
             ],
           ),
-          const Divider(height: 24),
+          const SizedBox(height: AppSizes.spaceBtwSections),
 
-          // 2. Phần chọn Màu sắc
-          const Text("Màu sắc", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 12),
+          // --- 2. DANH SÁCH THUỘC TÍNH (MÀU, SIZE) ---
+          if (availableAttributes.isNotEmpty)
+            ...availableAttributes.entries.map((entry) {
+              final attributeName = entry.key;
+              final attributeValues = entry.value.toList();
 
-          // Dùng Wrap để tự động xuống hàng
-          Wrap(
-            spacing: 8.0, // Khoảng cách ngang
-            runSpacing: 8.0, // Khoảng cách dọc
-            children: variations.map((variation) {
-              final String name = variation['name']!;
-              final String imagePath = variation['image']!; // Đường dẫn ảnh của bạn
-              final bool isSelected = _selectedColor == name;
-
-              return ChoiceChip(
-                label: Text(name),
-                // Dùng avatar để chèn ảnh nhỏ vào chip
-                avatar: Image.asset(imagePath, width: 24, height: 24),
-                selected: isSelected,
-                onSelected: (selected) {
-                  setState(() {
-                    _selectedColor = name;
-                  });
-                },
-                // Style cho chip
-                selectedColor: Colors.lightBlueAccent.withAlpha(50),
-                labelStyle: TextStyle(color: isSelected ? Colors.lightBlueAccent : Colors.black),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
-                  side: BorderSide(
-                    color: isSelected ? Colors.lightBlueAccent : Colors.grey[300]!,
-                  ),
-                ),
-                showCheckmark: false,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(attributeName, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: AppSizes.spaceBtwItems / 2),
+                  Obx(() => Wrap(
+                    spacing: 8,
+                    children: attributeValues.map((value) {
+                      final isSelected = controller.selectedAttributes[attributeName] == value;
+                      return MyChoiceChip(
+                        text: value,
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          if (selected) {
+                            controller.onAttributeSelected(product, attributeName, value);
+                          }
+                        },
+                      );
+                    }).toList(),
+                  )),
+                  const SizedBox(height: AppSizes.spaceBtwItems),
+                ],
               );
-            }).toList(),
-          ),
-          const SizedBox(height: 24),
+            }).toList()
+          else
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Text("Sản phẩm này không có tùy chọn nào."),
+            ),
 
-          // 3. Nút Thêm vào Giỏ hàng
+          const SizedBox(height: AppSizes.spaceBtwSections),
+
+          // --- 3. Nút Action ---
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent, // Dùng màu đã chọn
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              onPressed: _selectedColor != null ? () {
-                // Xử lý logic dựa trên `widget.mode`
-                if (widget.mode == SheetMode.buyNow) {
-                  _handleBuyNow();
-                } else {
-                  _handleAddToCart();
+              onPressed: () {
+                final variant = controller.selectedVariant.value;
+                
+                if (availableAttributes.isNotEmpty && variant == null) {
+                  Get.snackbar('Thông báo', 'Vui lòng chọn đầy đủ thuộc tính', 
+                      snackPosition: SnackPosition.BOTTOM, margin: const EdgeInsets.all(10));
+                  return;
                 }
-              } : null,
-              child: Text(title, style: const TextStyle(fontSize: 16)), // Dùng chữ đã chọn
+
+                if (variant != null) {
+                  final cartController = Get.put(CartController());
+                  cartController.addToCart(variant.id, 1);
+                  Navigator.pop(context);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: const EdgeInsets.all(AppSizes.md),
+              ),
+              child: Text(
+                mode == SheetMode.buyNow ? 'Buy Now' : 'Add to Cart',
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
-          ),
-          // Thêm padding cho an toàn (tránh các thanh điều hướng của HĐH)
-          SizedBox(height: MediaQuery.of(context).padding.bottom),
+          )
         ],
       ),
     );
-  }
-  void _handleAddToCart() {
-    // Logic thêm vào giỏ hàng
-    //print("Thêm vào giỏ hàng: $_selectedColor");
-    Navigator.pop(context); // Đóng bottom sheet sau khi thêm vào giỏ
-  }
-
-  void _handleBuyNow() {
-    // Logic mua ngay (ví dụ: chuyển đến trang thanh toán)
-    //print("Mua ngay: $_selectedColor");
-    Navigator.pop(context); 
-    // Sau đó có thể điều hướng đến trang Checkout
-    // Navigator.push(context, MaterialPageRoute(...));
   }
 }
