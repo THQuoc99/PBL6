@@ -267,3 +267,10 @@ def vnpay_ipn(request):
         
     # Trả về 00 để VNPAY kết thúc luồng IPN (Confirm Success)
     return JsonResponse({'RspCode': '00', 'Message': 'Confirm Success'})
+
+def test_payment_page(request):
+    """
+    Trang mẫu để test thanh toán.
+    Giao diện cho phép nhập order_id và gọi PayPal/VNPay endpoints.
+    """
+    return render(request, "payments/test_payment.html", {})

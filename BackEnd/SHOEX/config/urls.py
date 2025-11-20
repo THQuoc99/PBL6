@@ -9,5 +9,6 @@ urlpatterns = [
     path('graphql/', GraphQLView.as_view(graphiql=True, schema=schema)),
     path('payments/', include('payments.urls')),
     path('chatbot/', include('chatbot.urls')),
+    path('api/users/', include('users.urls')),
 
 ]

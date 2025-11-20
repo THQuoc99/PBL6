@@ -8,4 +8,5 @@ urlpatterns = [
     path("vnpay/<int:order_id>/", views.create_vnpay_payment, name="create_vnpay_payment"),
     path("vnpay-return/", views.vnpay_return, name="vnpay_return"),
     path("vnpay-ipn/", views.vnpay_ipn, name="vnpay_ipn"),
+    path("test/", views.test_payment_page, name="test_payment"),
 ]

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Test Payment - SHOEX</title>
+  <style>
+    body{font-family:Arial; padding:20px}
+    input, button{padding:8px; margin:6px 0}
+    .result{margin-top:12px; padding:10px; background:#f7f7f7; border:1px solid #ddd}
+  </style>
+</head>
+<body>
+  <h2>Trang Test Thanh Toán</h2>
+  <p>Nhập Order ID để test PayPal / VNPay</p>
+
+  <label>Order ID:</label><br/>
+  <input id="orderId" type="number" value="1" min="1" />
+
+  <div style="margin-top:10px">
+    <button id="btnPayPal">Tạo PayPal Payment</button>
+    <button id="btnVnPay">Tạo VNPay Payment</button>
+  </div>
+
+  <div class="result" id="result" style="display:none"></div>
+
+  <script>
+    function showResult(obj){
+      const r = document.getElementById('result');
+      r.style.display = 'block';
+      r.innerHTML = '<pre>'+JSON.stringify(obj, null, 2)+'</pre>';
+      if (obj.url || obj.payment_url){
+        const url = obj.url || obj.payment_url;
+        r.innerHTML += '<p><a href="'+url+'" target="_blank">Mở link thanh toán</a></p>';
+      }
+    }
+
+    document.getElementById('btnPayPal').addEventListener('click', async ()=>{
+      const id = document.getElementById('orderId').value;
+      const resp = await fetch(`/payments/paypal/${id}/`);
+      const data = await resp.json();
+      showResult(data);
+    });
+
+    document.getElementById('btnVnPay').addEventListener('click', async ()=>{
+      const id = document.getElementById('orderId').value;
+      const resp = await fetch(`/payments/vnpay/${id}/`);
+      const data = await resp.json();
+      showResult(data);
+    });
+  </script>
+</body>
+</html>

@@ -28,7 +28,8 @@ DEBUG = True
 ALLOWED_HOSTS = [
     '127.0.0.1', 
     'localhost', 
-    'successive-idella-unsparingly.ngrok-free.dev'
+    'successive-idella-unsparingly.ngrok-free.dev',
+    '10.0.2.2',
 ]
 
 
@@ -155,7 +156,26 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+
+# CORS settings
+CORS_ALLOW_ALL_ORIGINS = True # Chỉ dùng trong development
+CORS_ALLOW_CREDENTIALS = True
+
+# Cấu hình JWT
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+}
+
+# Cấu hình GraphQL
+GRAPHENE = {
+    "SCHEMA": "SHOEX.schema.schema",
+    'MIDDLEWARE': [
+        'graphql_jwt.middleware.JSONWebTokenMiddleware',
+    ],
+}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

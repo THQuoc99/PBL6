@@ -249,7 +249,7 @@ def get_llm_response(context_data, user_question):
     # --- KẾT THÚC SỬA LỖI ---
 
 
-    # 2. Xây dựng Prompt Ràng Buộc (Nâng cấp)
+    # 2. Xây dựng Prompt Ràng Buộc 
     prompt_template = f"""
 Bạn là trợ lý ảo AI của shop giày Shoex.
 Nhiệm vụ của bạn là trả lời câu hỏi của khách hàng.
