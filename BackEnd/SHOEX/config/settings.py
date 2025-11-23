@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "reviews",
     "discount",
     "address",
+    "brand",
 ]
 
 MIDDLEWARE = [

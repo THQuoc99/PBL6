@@ -88,12 +88,15 @@ class Product(models.Model):
     )
     
     # Thông tin bổ sung
-    brand = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        verbose_name="Thương hiệu"
+    brand = models.ForeignKey(
+    'brand.Brand',
+    on_delete=models.SET_NULL,
+    null=True,
+    blank=True,
+    related_name='products',
+    verbose_name="Thương hiệu"
     )
+
     model_code = models.CharField(
         max_length=100,
         blank=True,

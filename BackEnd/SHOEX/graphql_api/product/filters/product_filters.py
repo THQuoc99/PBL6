@@ -115,13 +115,10 @@ class ProductFilterSet(FilterSet):
 
 
 # ===== GRAPHQL INPUT TYPES =====
-
 class PriceRangeInput(InputObjectType):
     """Input cho khoảng giá"""
     min_price = graphene.Decimal(description="Giá tối thiểu")
     max_price = graphene.Decimal(description="Giá tối đa")
-
-
 class AttributeFilterInput(InputObjectType):
     """Input cho lọc theo attributes"""
     attribute_name = graphene.String(required=True, description="Tên thuộc tính")

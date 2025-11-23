@@ -1,4 +1,5 @@
 # ===== IMPORTS =====
+from .ultis.ultis import get_base_product_queryset
 import graphene
 from django.db.models import Q, Sum, Avg, F, Case, When, BooleanField, Value, OuterRef, Subquery, FloatField, IntegerField
 from django.utils import timezone
@@ -9,7 +10,7 @@ from django.db.models.functions import Coalesce
 # ===== DJANGO MODELS =====
 from products.models import Product, ProductVariant, Category
 from graphene_django import DjangoConnectionField
-from .enum.sortEnum import ProductSortEnum
+from .sort.sorting import ProductSortInput, apply_product_sorting
 from orders.models import OrderItem  # giả sử OrderItem có field created_at và variant liên kết ProductVariant
 from reviews.models import Review
 # ===== GRAPHQL TYPES =====
@@ -28,13 +29,16 @@ from .types.product import (
 # ===== FILTER INPUTS =====
 from .filters.product_filters import (
     # Product filters
-    ProductFilterInput,
+    # ProductFilterInput,
     ProductVariantFilterInput,
     
     # Category filters
     CategoryFilterInput
 )
-
+from .filters.filtering import (
+    # Product filters
+    ProductFilterInput,
+    apply_product_filters)
 # ===== MUTATIONS =====
 # Product & Variant mutations
 from .mutations.product_mutations import (
@@ -120,10 +124,9 @@ class ProductQueries(graphene.ObjectType):
         ProductCountableConnection,
         filter=ProductFilterInput(description="Bộ lọc sản phẩm"),
         sort_by=graphene.Argument(
-            ProductSortEnum,
+            ProductSortInput,
             description="Sắp xếp theo: price_asc, price_desc, name_asc, name_desc, created_at_desc, rating_desc, sales_desc"
         ),
-        search=graphene.Argument(graphene.String, description="Tìm kiếm theo tên sản phẩm"),
         description="Danh sách tất cả sản phẩm với pagination"
     )
     
@@ -265,86 +268,18 @@ class ProductQueries(graphene.ObjectType):
         return None
 
     def resolve_products(self, info, **kwargs):
-        """Resolve products list with filtering and sorting"""
-        thirty_days_ago = timezone.now() - timedelta(days=30)
+        """Resolve danh sách Product với filter và sort"""
+        qs = get_base_product_queryset()
 
-        # QuerySet cơ bản
-        qs = Product.objects.filter(is_active=True) \
-            .select_related("category", "store") \
-            .prefetch_related("gallery_images", "variants", "attribute_options") \
-            .annotate(
-                # Tổng số đã bán
-                sold_count=Coalesce(Sum('variants__order_items__quantity'), 0),
-                
-                # Tổng số đã bán trong 30 ngày qua (dùng order__created_at)
-                sold_count_last_30=Coalesce(Sum(
-                    'variants__order_items__quantity',
-                    filter=Q(variants__order_items__order__created_at__gte=thirty_days_ago)
-                ), 0),
-                
-                # Rating trung bình trong 30 ngày qua (dùng order__created_at)
-                avg_rating_last_30=Coalesce(Avg(
-                    'variants__order_items__reviews__rating',
-                    filter=Q(variants__order_items__order__created_at__gte=thirty_days_ago)
-                ), 0.0),
-            ).annotate(
-                is_hot=Case(
-                    When(sold_count_last_30__gte=50, then=Value(True)),
-                    default=Value(False),
-                    output_field=BooleanField()
-                ),
-                is_new=Case(
-                    When(created_at__gte=thirty_days_ago, then=Value(True)),
-                    default=Value(False),
-                    output_field=BooleanField()
-                )
-            )
-
-        # Map sắp xếp
-        SORT_MAP = {
-            "price_asc": "base_price",
-            "price_desc": "-base_price",
-            "name_asc": "name",
-            "name_desc": "-name",
-            "created_at_desc": "-created_at",
-            "rating_desc": "-rating",
-            "sales_desc": "-sold_count",
-        }
-
-        # Apply sorting
-        sort_by = kwargs.get('sort_by', 'created_at_desc')
-        qs = qs.order_by(SORT_MAP.get(sort_by, "-created_at"))
-
-        # Apply filtering
+        # Apply filtering (sử dụng helper)
         filter_data = kwargs.get("filter")
         if filter_data:
-            if getattr(filter_data, 'search', None):
-                qs = qs.filter(
-                    Q(name__icontains=filter_data.search) |
-                    Q(description__icontains=filter_data.search)
-                )
-            if getattr(filter_data, 'category_id', None):
-                qs = qs.filter(category_id=filter_data.category_id)
-            if getattr(filter_data, 'category_ids', None):
-                qs = qs.filter(category_id__in=filter_data.category_ids)
-            if getattr(filter_data, 'price_range', None):
-                qs = qs.filter(
-                    base_price__gte=filter_data.price_range.min,
-                    base_price__lte=filter_data.price_range.max,
-                )
-            if getattr(filter_data, 'min_rating', None):
-                qs = qs.filter(rating__gte=filter_data.min_rating)
-            if getattr(filter_data, 'has_discount', None) and filter_data.has_discount:
-                qs = qs.filter(discount__gt=0)
-            if getattr(filter_data, 'is_featured', None) and filter_data.is_featured:
-                qs = qs.filter(
-                    sold_count__gte=50,
-                    rating__gte=4.5
-                )
-            if getattr(filter_data, 'is_hot', None) and filter_data.is_hot:
-                qs = qs.filter(is_hot=True)
-            if getattr(filter_data, 'is_new', None) and filter_data.is_new:
-                qs = qs.filter(is_new=True)
+            qs = apply_product_filters(qs, filter_data)
+
+        # Apply sorting (sử dụng helper)
+        sort_by = kwargs.get('sort_by', 'created_at_desc')
+        qs = apply_product_sorting(qs, sort_by)
+
 
         return qs
     

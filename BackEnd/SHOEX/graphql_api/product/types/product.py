@@ -7,11 +7,16 @@ from products.models import (
     ProductAttribute, ProductAttributeOption,
     ProductImage
 )
+from brand.models import Brand
     
 from .utils import get_max_discount
 from django.db.models import Q, Max
 from django.utils import timezone
 from decimal import Decimal
+class BrandType(DjangoObjectType):
+    class Meta:
+        model = Brand
+        fields = "__all__"
 
 class CategoryType(DjangoObjectType):
     """Danh mục sản phẩm - Cây phân cấp"""
@@ -201,9 +206,6 @@ class ProductType(DjangoObjectType):
         fields = '__all__'
         interfaces = (relay.Node,)
     
-    # ===== THÔNG TIN CƠ BẢN =====
-    seller_name = graphene.String(description="Tên người bán")
-    seller_avatar = graphene.String(description="Avatar người bán")
     # ===== GIÁ CẢ & KHUYẾN MÃI =====
     price_range = graphene.String(description="Khoảng giá")
     min_price = graphene.Decimal(description="Giá thấp nhất")
@@ -247,13 +249,6 @@ class ProductType(DjangoObjectType):
         return self.is_new
     def resolve_is_hot(self, info):
         return self.is_hot
-    def resolve_seller_name(self, info):
-        """Tên người bán"""
-        return getattr(self.seller, 'username', 'Unknown Seller')
-    
-    def resolve_seller_avatar(self, info):
-        """Avatar người bán"""
-        return getattr(self.seller, 'avatar', None)
     
     def resolve_price_range(self, info):
         """Khoảng giá từ variants"""
@@ -375,7 +370,7 @@ class ProductType(DjangoObjectType):
     # ===== THÔNG TIN BỔ SUNG =====
     def resolve_tags(self, info):
         """Tags sản phẩm"""
-        tags = [self.category.name, self.brand] if self.brand else [self.category.name]
+        tags = [self.category.name, self.brand.name] if self.brand else [self.category.name]
         # Thêm tags từ attributes
         attributes = self.resolve_available_attributes(info)
         for attr in attributes:
@@ -426,7 +421,7 @@ class CreateProductInput(graphene.InputObjectType):
     name = graphene.String(required=True)
     description = graphene.String(required=True)
     base_price = graphene.Decimal(required=True)
-    brand = graphene.String()
+    brand_id = graphene.ID(description="ID thương hiệu")
     model_code = graphene.String()
     is_featured = graphene.Boolean(default_value=False)
     
@@ -462,7 +457,7 @@ class CreateProduct(graphene.Mutation):
                 name=input.name,
                 description=input.description,
                 base_price=input.base_price,
-                brand=input.get('brand'),
+                brand_id=input.get('brand_id'),
                 model_code=input.get('model_code'),
                 is_featured=input.get('is_featured', False)
             )
