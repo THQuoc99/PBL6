@@ -155,13 +155,13 @@ class ProductFilterInput(InputObjectType):
     attributes = graphene.List(AttributeFilterInput, description="Lọc theo thuộc tính")
     
     # ===== TRẠNG THÁI =====
-    is_active = graphene.Boolean(description="Sản phẩm đang hoạt động")
     has_stock = graphene.Boolean(description="Còn hàng")
     has_discount = graphene.Boolean(description="Có giảm giá")
     
     # ===== ĐẶC BIỆT =====
-    is_featured = graphene.Boolean(description="Sản phẩm nổi bật")
+    is_hot = graphene.Boolean(description="Sản phẩm bán chạy")
     is_flash_sale = graphene.Boolean(description="Flash sale")
+    is_new = graphene.Boolean(description="Sản phầm mới")
     
     # ===== RATING =====
     min_rating = graphene.Float(description="Đánh giá tối thiểu")

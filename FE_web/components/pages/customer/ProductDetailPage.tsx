@@ -105,17 +105,17 @@ Thiết kế hiện đại kết hợp với chất liệu cao cấp, mang lại
       'Phù hợp mọi hoạt động'
     ],
     images: [
-      '/api/placeholder/600/600',
-      '/api/placeholder/600/600',
-      '/api/placeholder/600/600',
-      '/api/placeholder/600/600',
-      '/api/placeholder/600/600'
+      'https://static.fbshop.vn/wp-content/uploads/2023/12/Giay-Nike-Air-Max-270-Black-White-ad.gif',
+      'https://static.fbshop.vn/wp-content/uploads/2023/12/Giay-Nike-Air-Max-270-Black-White-ds.gif',
+      'https://cdn-images.farfetch-contents.com/12/83/31/75/12833175_21352546_1000.jpg',
+      'https://cdn-images.farfetch-contents.com/12/83/31/75/12833175_21352546_1000.jpg',
+      'https://cdn-images.farfetch-contents.com/12/83/31/75/12833175_21352546_1000.jpg'
     ],
     colors: [
-      { id: 'black', name: 'Đen', hex: '#000000', image: '/api/placeholder/600/600' },
-      { id: 'white', name: 'Trắng', hex: '#FFFFFF', image: '/api/placeholder/600/600' },
-      { id: 'red', name: 'Đỏ', hex: '#FF0000', image: '/api/placeholder/600/600' },
-      { id: 'blue', name: 'Xanh dương', hex: '#0000FF', image: '/api/placeholder/600/600' }
+      { id: 'black', name: 'Đen', hex: '#000000', image: '' },
+      { id: 'white', name: 'Trắng', hex: '#FFFFFF', image: 'https://cdn-images.farfetch-contents.com/12/83/31/75/12833175_21352546_1000.jpg' },
+      { id: 'red', name: 'Đỏ', hex: '#FF0000', image: 'https://static.fbshop.vn/wp-content/uploads/2023/12/Giay-Nike-Air-Max-270-Red-White-ds.gif' },
+      { id: 'blue', name: 'Xanh', hex: '#0074D9', image: 'https://static.fbshop.vn/wp-content/uploads/2023/12/Giay-Nike-Air-Max-270-Blue-White-ds.gif' }
     ],
     sizes: [
       { id: '38', size: '38', stock: 5 },
@@ -132,7 +132,7 @@ Thiết kế hiện đại kết hợp với chất liệu cao cấp, mang lại
     store: {
       id: 'store1',
       name: 'SHOEX Official Store',
-      avatar: '/api/placeholder/60/60',
+      avatar: 'https://static.fbshop.vn/wp-content/uploads/2023/12/Giay-Nike-Air-Max-270-Black-White-ad.gif',
       rating: 4.9,
       followers: 125000,
       products: 1250,
@@ -278,23 +278,27 @@ Thiết kế hiện đại kết hợp với chất liệu cao cấp, mang lại
                 alt={product.name}
                 className="w-full h-full object-cover"
               />
-              
               {/* Navigation Arrows */}
               <button 
-                onClick={() => setSelectedImageIndex(Math.max(0, selectedImageIndex - 1))}
+                onClick={() => {
+                  setSelectedImageIndex(Math.max(0, selectedImageIndex - 1));
+                  if (selectedColor) setSelectedColor('');
+                }}
                 className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-colors"
                 disabled={selectedImageIndex === 0}
               >
                 <ChevronLeft className="h-5 w-5" />
               </button>
               <button 
-                onClick={() => setSelectedImageIndex(Math.min(product.images.length - 1, selectedImageIndex + 1))}
+                onClick={() => {
+                  setSelectedImageIndex(Math.min(product.images.length - 1, selectedImageIndex + 1));
+                  if (selectedColor) setSelectedColor('');
+                }}
                 className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white p-2 rounded-full shadow-lg transition-colors"
                 disabled={selectedImageIndex === product.images.length - 1}
               >
                 <ChevronRight className="h-5 w-5" />
               </button>
-
               {/* Wishlist Button */}
               <button 
                 onClick={() => setIsWishlisted(!isWishlisted)}
@@ -309,7 +313,10 @@ Thiết kế hiện đại kết hợp với chất liệu cao cấp, mang lại
               {product.images.map((image, index) => (
                 <button
                   key={index}
-                  onClick={() => setSelectedImageIndex(index)}
+                  onClick={() => {
+                    setSelectedImageIndex(index);
+                    if (selectedColor) setSelectedColor('');
+                  }}
                   className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
                     selectedImageIndex === index ? 'border-blue-500' : 'border-gray-200'
                   }`}
@@ -363,25 +370,35 @@ Thiết kế hiện đại kết hợp với chất liệu cao cấp, mang lại
             <div>
               <h3 className="text-sm font-medium text-gray-900 mb-3">Màu sắc: {product.colors.find(c => c.id === selectedColor)?.name}</h3>
               <div className="flex flex-wrap gap-3">
-                {product.colors.map((color) => (
-                  <button
-                    key={color.id}
-                    onClick={() => setSelectedColor(color.id)}
-                    className={`relative flex items-center justify-center w-12 h-12 rounded-lg border-2 transition-colors ${
-                      selectedColor === color.id ? 'border-blue-500' : 'border-gray-200'
-                    }`}
-                    style={{ backgroundColor: color.hex }}
-                  >
-                    {color.hex === '#FFFFFF' && (
-                      <div className="w-8 h-8 border border-gray-300 rounded-lg"></div>
-                    )}
-                    {selectedColor === color.id && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                      </div>
-                    )}
-                  </button>
-                ))}
+                {product.colors.map((color) => {
+                  // Lấy ảnh đại diện cho màu
+                  let colorImage = '';
+                  if (Array.isArray((color as any).images) && (color as any).images.length > 0) {
+                    colorImage = (color as any).images[0];
+                  } else if (color.image) {
+                    colorImage = color.image;
+                  }
+                  return (
+                    <button
+                      key={color.id}
+                      onClick={() => setSelectedColor(color.id)}
+                      className={`relative flex items-center justify-center w-12 h-12 rounded-lg border-2 transition-colors ${
+                        selectedColor === color.id ? 'border-blue-500' : 'border-gray-200'
+                      }`}
+                    >
+                      {colorImage ? (
+                        <img src={colorImage} alt={color.name} className="w-10 h-10 object-cover rounded-lg" />
+                      ) : (
+                        <div className="w-10 h-10 bg-gray-200 rounded-lg"></div>
+                      )}
+                      {selectedColor === color.id && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                          <div className="w-2 h-2 bg-white rounded-full"></div>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -394,7 +411,7 @@ Thiết kế hiện đại kết hợp với chất liệu cao cấp, mang lại
                     key={size.id}
                     onClick={() => size.stock > 0 && setSelectedSize(size.id)}
                     disabled={size.stock === 0}
-                    className={`relative p-3 text-center border rounded-lg transition-colors ${
+                    className={`relative px-2 py-1 text-center border rounded-md transition-colors text-sm min-w-[36px] h-9 flex flex-col items-center justify-center ${
                       selectedSize === size.id 
                         ? 'border-blue-500 bg-blue-50 text-blue-700' 
                         : size.stock === 0 
@@ -402,13 +419,13 @@ Thiết kế hiện đại kết hợp với chất liệu cao cấp, mang lại
                           : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <div className="font-medium">{size.size}</div>
+                    <div className="font-medium leading-none">{size.size}</div>
                     {size.stock <= 5 && size.stock > 0 && (
-                      <div className="text-xs text-orange-500">Còn {size.stock}</div>
+                      <div className="text-[10px] text-orange-500 leading-none">Còn {size.stock}</div>
                     )}
                     {size.stock === 0 && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-100/75 rounded-lg">
-                        <span className="text-xs text-gray-500">Hết hàng</span>
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-100/75 rounded-md">
+                        <span className="text-[10px] text-gray-500">Hết hàng</span>
                       </div>
                     )}
                   </button>

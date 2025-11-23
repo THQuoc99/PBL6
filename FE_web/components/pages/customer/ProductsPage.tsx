@@ -26,7 +26,7 @@ export default function CustomerProductsPage({ onNavigateToSeller, onNavigate }:
       originalPrice: 3000000,
       rating: 4.8,
       reviews: 124,
-      image: '/api/placeholder/300/300',
+      image: 'https://static.fbshop.vn/wp-content/uploads/2023/12/Giay-Nike-Air-Max-270-Black-White-ad.gif',
       colors: ['Đen', 'Trắng', 'Xanh'],
       sizes: [39, 40, 41, 42, 43],
       isNew: true,
@@ -40,7 +40,7 @@ export default function CustomerProductsPage({ onNavigateToSeller, onNavigate }:
       price: 2800000,
       rating: 4.9,
       reviews: 89,
-      image: '/api/placeholder/300/300',
+      image: 'https://bizweb.dktcdn.net/thumb/small/100/347/092/products/gx5915-s1.jpg?v=1666974717997',
       colors: ['Trắng', 'Đen'],
       sizes: [40, 41, 42, 43, 44],
       isHot: true
@@ -53,7 +53,7 @@ export default function CustomerProductsPage({ onNavigateToSeller, onNavigate }:
       price: 1200000,
       rating: 4.6,
       reviews: 256,
-      image: '/api/placeholder/300/300',
+      image: 'https://product.hstatic.net/1000387035/product/113_eea5f17eb29b4bd78c5c89e40f45da50_grande.png',
       colors: ['Đen', 'Trắng', 'Đỏ', 'Xanh'],
       sizes: [38, 39, 40, 41, 42]
     },
@@ -280,20 +280,24 @@ export default function CustomerProductsPage({ onNavigateToSeller, onNavigate }:
               <div className="mb-8">
                 <h4 className="font-medium text-gray-900 mb-4">Khoảng giá</h4>
                 <div className="space-y-4">
-                  <div className="flex space-x-2">
+                  <div className="flex gap-2">
                     <input
                       type="number"
+                      min={0}
+                      max={5000000}
                       placeholder="Từ"
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      className="w-1/2 border border-gray-300 rounded px-2 py-1 text-sm"
                       value={priceRange[0]}
-                      onChange={(e) => setPriceRange([Number(e.target.value), priceRange[1]])}
+                      onChange={e => setPriceRange([+e.target.value, priceRange[1]])}
                     />
                     <input
                       type="number"
+                      min={0}
+                      max={5000000}
                       placeholder="Đến"
-                      className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      className="w-1/2 border border-gray-300 rounded px-2 py-1 text-sm"
                       value={priceRange[1]}
-                      onChange={(e) => setPriceRange([priceRange[0], Number(e.target.value)])}
+                      onChange={e => setPriceRange([priceRange[0], +e.target.value])}
                     />
                   </div>
                   <input
@@ -345,7 +349,7 @@ export default function CustomerProductsPage({ onNavigateToSeller, onNavigate }:
                         onChange={() => toggleBrand(brand.id)}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
-                      <span className="ml-3 text-sm text-gray-700 flex-1">
+                      <span className="ml-3 text-sm text-gray-700 </div>flex-1">
                         {brand.name}
                       </span>
                       <span className="text-xs text-gray-500">({brand.count})</span>

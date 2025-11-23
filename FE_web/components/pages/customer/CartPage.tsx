@@ -23,22 +23,22 @@ export default function CartPage({ onNavigate }: CartPageProps) {
     {
       id: 1,
       name: 'Nike Air Max 270',
-      price: 2490000,
+      price: 2500000,
       originalPrice: 2890000,
       quantity: 1,
       size: '42',
-      color: 'Đen/Trắng',
-      image: '/api/placeholder/150/150',
+      color: 'Đen',
+      image: 'https://static.fbshop.vn/wp-content/uploads/2023/12/Giay-Nike-Air-Max-270-Black-White-ds.gif',
       inStock: true
     },
     {
       id: 2,
       name: 'Adidas Ultraboost 22',
-      price: 3200000,
+      price: 2800000,
       quantity: 2,
       size: '41',
       color: 'Xanh Navy',
-      image: '/api/placeholder/150/150',
+      image: 'https://bizweb.dktcdn.net/thumb/1024x1024/100/347/092/products/gx5915-s1.jpg',
       inStock: true
     },
     {
@@ -48,8 +48,8 @@ export default function CartPage({ onNavigate }: CartPageProps) {
       originalPrice: 1500000,
       quantity: 1,
       size: '40',
-      color: 'Trắng',
-      image: '/api/placeholder/150/150',
+      color: 'Đen',
+      image: 'https://abc-mart.com.vn/cdn/shop/files/M9160C-1.jpg?v=1755838588&width=990',
       inStock: false
     }
   ]);
@@ -186,12 +186,16 @@ export default function CartPage({ onNavigate }: CartPageProps) {
                       </div>
 
                       {/* Product Image */}
-                      <div 
-                        className="w-24 h-24 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-gray-300 transition-colors"
+                    <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 cursor-pointer relative group">
+                      <img 
+                        src={item.image} 
+                        alt={item.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         onClick={() => onNavigate?.('product-detail', { productId: item.id })}
-                      >
-                        <span className="text-gray-500 text-xs">Image</span>
-                      </div>
+                      />
+                      {/* Optional: Overlay khi hover */}
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    </div>
 
                       {/* Product Info */}
                       <div className="flex-1">

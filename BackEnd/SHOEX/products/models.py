@@ -2,6 +2,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 import json
 from django.utils.text import slugify
+from django.db.models import Avg, Count
 # Create your models here.
 
 class Category(models.Model):
@@ -119,11 +120,6 @@ class Product(models.Model):
         default=False,  
         verbose_name="Sản phẩm nổi bật"
     )
-    is_hot = models.BooleanField(
-        default=False,
-        verbose_name="Sản phẩm hot",
-        help_text="Sản phẩm bán chạy, được quan tâm nhiều"
-    )
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Ngày tạo"
@@ -140,6 +136,8 @@ class Product(models.Model):
         related_name='products',
         verbose_name="Bộ sưu tập"
     )
+    rating = models.FloatField(default=0.0)
+    review_count = models.IntegerField(default=0)
     class Meta:
         verbose_name = "Sản phẩm"
         verbose_name_plural = "Sản phẩm" 
@@ -160,12 +158,24 @@ class Product(models.Model):
             # Gộp lại: prefix + số thứ tự (4 chữ số)
             self.model_code = f"PRD-{count:04d}"
         super().save(*args, **kwargs)
-    @property
+    @property   
     def min_price(self):
         """Giá thấp nhất từ variants"""
         return self.variants.filter(is_active=True).aggregate(
             models.Min('price')
         )['price__min'] or self.base_price
+    def update_rating(self):
+        """Cập nhật rating và số lượng review liên quan đến product này"""
+        from reviews.models import Review  # import tại chỗ tránh circular import
+
+        agg = Review.objects.filter(order_item__variant__product=self).aggregate(
+            avg_rating=Avg('rating'),
+            total_reviews=Count('review_id')
+        )
+
+        self.rating = agg['avg_rating'] or 0
+        self.review_count = agg['total_reviews'] or 0
+        self.save(update_fields=['rating', 'review_count'])
     @property  
     def max_price(self):
         """Giá cao nhất từ variants"""
@@ -179,6 +189,10 @@ class Product(models.Model):
         return self.variants.filter(is_active=True).aggregate(
             models.Sum('stock')
         )['stock__sum'] or 0
+    @property
+    def color_images(self):
+        return self.attribute_options.filter(attribute__type='color')
+
 
     @property
     def available_colors(self):
@@ -415,7 +429,7 @@ class ProductVariant(models.Model):
         """Lấy tên màu từ option_combinations"""
         try:
             options = json.loads(self.option_combinations) if isinstance(self.option_combinations, str) else self.option_combinations
-            return options.get('Color', 'N/A')
+            return options.get('Màu', 'N/A')
         except (json.JSONDecodeError, TypeError):
             return 'N/A'
 
@@ -438,7 +452,7 @@ class ProductVariant(models.Model):
         """Lấy ảnh màu tương ứng"""
         color = self.color_name
         if color != 'N/A':
-            return self.product.color_images.filter(color_name=color).first()
+            return self.product.color_images.filter(value=color).first()
         return None
 
     def clean(self):

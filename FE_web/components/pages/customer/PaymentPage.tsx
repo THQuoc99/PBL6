@@ -179,19 +179,19 @@ export default function PaymentPage({ onNavigate }: PaymentPageProps) {
     {
       id: '1',
       name: 'Nike Air Max 270 Premium',
-      image: '/api/placeholder/80/80',
+      image: 'https://static.fbshop.vn/wp-content/uploads/2023/12/Giay-Nike-Air-Max-270-Black-White-ds.gif',
       price: 2500000,
       quantity: 1,
       variant: 'Đen - Size 42'
     },
-    {
-      id: '2',
-      name: 'Adidas Ultraboost 22',
-      image: '/api/placeholder/80/80',
-      price: 2800000,
-      quantity: 1,
-      variant: 'Trắng - Size 42'
-    }
+    // {
+    //   id: '2',
+    //   name: 'Adidas Ultraboost 22',
+    //   image: '/api/placeholder/80/80',
+    //   price: 2800000,
+    //   quantity: 1,
+    //   variant: 'Trắng - Size 42'
+    // }
   ];
 
   const shippingOptions = [

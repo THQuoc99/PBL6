@@ -2,10 +2,18 @@ import os
 from django.db.models.signals import post_delete, pre_save
 from django.dispatch import receiver
 from django.conf import settings
-
+from django.db.models.signals import post_delete,pre_save
+from django.dispatch import receiver
+from reviews.models import Review
 from .models import ProductImage, ProductAttributeOption
 
+@receiver(pre_save, sender=Review)
+def update_product_rating_on_save(sender, instance, **kwargs):
+    instance.order_item.variant.product.update_rating()
 
+@receiver(post_delete, sender=Review)
+def update_product_rating_on_delete(sender, instance, **kwargs):
+    instance.order_item.variant.product.update_rating()
 @receiver(post_delete, sender=ProductImage)
 def delete_product_image_file(sender, instance, **kwargs):
     """

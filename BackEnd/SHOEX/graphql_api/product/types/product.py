@@ -1,3 +1,4 @@
+from discount.models import Voucher
 import graphene
 from graphene import relay
 from graphene_django import DjangoObjectType
@@ -6,7 +7,11 @@ from products.models import (
     ProductAttribute, ProductAttributeOption,
     ProductImage
 )
-
+    
+from .utils import get_max_discount
+from django.db.models import Q, Max
+from django.utils import timezone
+from decimal import Decimal
 
 class CategoryType(DjangoObjectType):
     """Danh mục sản phẩm - Cây phân cấp"""
@@ -18,7 +23,7 @@ class CategoryType(DjangoObjectType):
     # Thêm các trường tùy chỉnh
     product_count = graphene.Int(description="Số lượng sản phẩm trong danh mục")
     thumbnail_image = graphene.String(description="Hình ảnh đại diện danh mục")
-    full_path = graphene.String(description="Đường dẫn đầy đủ của danh mục")
+    full_path = graphene.List(lambda: CategoryType, description="Đường dẫn đầy đủ của danh mục")
     
     # Explicitly define subcategories field to ensure it works
     subcategories = graphene.List(lambda: CategoryType, description="Danh mục con")
@@ -55,14 +60,12 @@ class CategoryType(DjangoObjectType):
         return None
     
     def resolve_full_path(self, info):
-        """Đường dẫn đầy đủ: Thời trang > Giày dép > Giày thể thao"""
-        path = [self.name]
+        path = [self]  # bắt đầu từ chính category hiện tại
         parent = self.parent
         while parent:
-            path.insert(0, parent.name)
+            path.insert(0, parent)  # chèn parent lên đầu danh sách
             parent = parent.parent
-        return " > ".join(path)
-    
+        return path
     def resolve_subcategories(self, info):
         """Resolve subcategories - danh mục con"""
         return self.subcategories.filter(is_active=True).order_by('name')
@@ -153,20 +156,16 @@ class ProductVariantType(DjangoObjectType):
     def resolve_is_in_stock(self, info):
         """Kiểm tra còn hàng"""
         return self.is_in_stock
-    
     def resolve_discount_percentage(self, info):
-        """Tính phần trăm giảm giá so với base_price"""
-        if self.product.base_price > self.price:
-            return float((self.product.base_price - self.price) / self.product.base_price * 100)
-        return 0.0
-    
-    def resolve_original_price(self, info):
-        """Giá gốc"""
-        return self.product.base_price
-    
+        # Lấy object product
+        product = self.product
+        # Gọi resolver discount của ProductType
+        discount = get_max_discount(product)
+        return discount
+
     def resolve_final_price(self, info):
-        """Giá cuối cùng"""
-        return self.price
+        discount = Decimal(get_max_discount(self.product))  # convert float -> Decimal
+        return self.price * (Decimal('1.0') - discount / Decimal('100.0'))
     
     def resolve_color_name(self, info):
         """Lấy tên màu từ option_combinations"""
@@ -210,7 +209,10 @@ class ProductType(DjangoObjectType):
     min_price = graphene.Decimal(description="Giá thấp nhất")
     max_price = graphene.Decimal(description="Giá cao nhất")
     discount_percentage = graphene.Float(description="% giảm giá cao nhất")
+    final_price = graphene.Decimal(description="Giá cuối cùng")
     has_discount = graphene.Boolean(description="Có giảm giá không")
+    is_new=graphene.Boolean(description="Sản phẩm mới")
+    is_hot=graphene.Boolean(description="Sản phẩm bán chạy")
     # ===== HÌNH ẢNH THEO MODEL MỚI =====
     gallery_images = graphene.List(ProductImageType, description="Ảnh gallery sản phẩm")
     thumbnail_image = graphene.Field(ProductImageType, description="Ảnh đại diện")
@@ -230,7 +232,7 @@ class ProductType(DjangoObjectType):
     
     # ===== ĐÁNH GIÁ =====
     rating_average = graphene.Float(description="Điểm đánh giá trung bình")
-    rating_count = graphene.Int(description="Số lượng đánh giá")
+    review_count = graphene.Int(description="Số lượng đánh giá")
     
     # ===== TRẠNG THÁI =====
     availability_status = graphene.String(description="Trạng thái hàng")
@@ -241,7 +243,10 @@ class ProductType(DjangoObjectType):
     warranty_info = graphene.String(description="Thông tin bảo hành")
     
     # ===== RESOLVERS =====
-    
+    def resolve_is_new(self, info):
+        return self.is_new
+    def resolve_is_hot(self, info):
+        return self.is_hot
     def resolve_seller_name(self, info):
         """Tên người bán"""
         return getattr(self.seller, 'username', 'Unknown Seller')
@@ -264,25 +269,27 @@ class ProductType(DjangoObjectType):
     def resolve_max_price(self, info):
         """Giá cao nhất (sử dụng property từ model)"""
         return self.max_price
-    
+
+
     def resolve_discount_percentage(self, info):
-        """% giảm giá cao nhất"""
-        if self.base_price <= 0:
-            return 0.0
-        
-        variants = self.variants.filter(is_active=True)
-        max_discount = 0.0
-        
-        for variant in variants:
-            if self.base_price > variant.price:
-                discount = (self.base_price - variant.price) / self.base_price * 100
-                max_discount = max(max_discount, discount)
-        
-        return max_discount
-    
+        return get_max_discount(self)
+
+    def resolve_final_price(self, info):
+        discount = Decimal(get_max_discount(self))  # convert float -> Decimal
+        return self.base_price * (Decimal('1.0') - discount / Decimal('100.0'))
+
     def resolve_has_discount(self, info):
         """Có giảm giá không"""
-        return self.resolve_discount_percentage(info) > 0
+        # Always use the resolver for discount_percentage, not a model attribute
+        discount = None
+        # Try to use the resolver if present
+        if hasattr(self, 'resolve_discount_percentage'):
+            discount = self.resolve_discount_percentage(info)
+        elif hasattr(self, 'discount_percentage'):
+            discount = self.discount_percentage
+        else:
+            discount = 0.0
+        return discount > 0
     
     # ===== HÌNH ẢNH THEO MODEL MỚI =====
     def resolve_gallery_images(self, info):
@@ -328,8 +335,7 @@ class ProductType(DjangoObjectType):
     
     # ===== THỐNG KÊ =====
     def resolve_total_sold(self, info):
-        """Tổng số đã bán - TODO: tích hợp với order system"""
-        return 0
+        return self.sold_count
     
     def resolve_total_stock(self, info):
         """Tổng tồn kho (sử dụng property từ model)"""
@@ -349,11 +355,11 @@ class ProductType(DjangoObjectType):
     # ===== ĐÁNH GIÁ =====
     def resolve_rating_average(self, info):
         """Điểm đánh giá trung bình - TODO: tích hợp review system"""
-        return 4.5  # Mock data
+        return self.rating  # Mock data
     
-    def resolve_rating_count(self, info):
+    def resolve_review_count(self, info):
         """Số lượng đánh giá - TODO: tích hợp review system"""
-        return 128  # Mock data
+        return self.review_count  # Mock data
     
     # ===== TRẠNG THÁI =====
     def resolve_availability_status(self, info):
@@ -370,7 +376,6 @@ class ProductType(DjangoObjectType):
     def resolve_tags(self, info):
         """Tags sản phẩm"""
         tags = [self.category.name, self.brand] if self.brand else [self.category.name]
-        
         # Thêm tags từ attributes
         attributes = self.resolve_available_attributes(info)
         for attr in attributes:
