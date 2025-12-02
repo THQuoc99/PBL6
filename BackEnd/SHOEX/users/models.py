@@ -8,13 +8,10 @@ class User(AbstractUser):
         ('admin', 'Admin'),
     ]
 
-    # Bỏ user_id vì AbstractUser đã có sẵn primary key id (AutoField)
-    # Bỏ username, email, password vì AbstractUser có sẵn các trường đó
-    # (có thể ghi đè nếu muốn thay đổi unique=True, max_length…)
-
     role = models.CharField(
         max_length=10,
         choices=ROLE_CHOICES,
+        default='buyer', # Nên có default để tránh lỗi khi tạo user bằng lệnh createsuperuser
         verbose_name="Vai trò",
         help_text="Xác định quyền của người dùng: Buyer, Seller, Admin"
     )
@@ -33,7 +30,24 @@ class User(AbstractUser):
         verbose_name="Ngày tạo",
         help_text="Ngày giờ người dùng được tạo"
     )
-    # AbstractUser đã có sẵn is_active, is_staff, is_superuser, last_login, date_joined
+    
+    # --- CÁC TRƯỜNG MỚI TRONG DATANEW.SQL ---
+    
+    # Khớp với avatar character varying(100)
+    avatar = models.ImageField(
+        upload_to='users/avatars/', 
+        max_length=100, 
+        null=True, 
+        blank=True,
+        verbose_name="Ảnh đại diện"
+    )
+    
+    # Khớp với birth_date date
+    birth_date = models.DateField(
+        null=True, 
+        blank=True,
+        verbose_name="Ngày sinh"
+    )
 
     def __str__(self):
         return self.username

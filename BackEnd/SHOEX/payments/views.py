@@ -1,72 +1,95 @@
 import paypalrestsdk
 from django.conf import settings
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseRedirect
 from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
+from django.shortcuts import render, redirect
 from .models import Payment
 from orders.models import Order
-import hmac, hashlib, urllib.parse, datetime
-from django.shortcuts import render 
 
-# TỶ GIÁ
-USD_RATE = 26360.00 
-# ------------------ CẤU HÌNH PAYPAL ------------------
+# ✅ IMPORT ĐẦY ĐỦ CÁC THƯ VIỆN CẦN THIẾT
+import hmac
+import hashlib
+import urllib.parse
+import datetime
 
+# ------------------ CUSTOM DEEP LINK REDIRECT ------------------
+class DeepLinkRedirect(HttpResponseRedirect):
+    allowed_schemes = ['http', 'https', 'ftp', 'myapp']
+
+# ------------------ CẤU HÌNH CHUNG ------------------
+# Thay bằng domain ngrok của bạn hoặc http://10.0.2.2:8000 nếu chạy local hoàn toàn
+NGROK_HOST = "https://successive-idella-unsparingly.ngrok-free.dev" 
+USD_RATE = 26360.0
+
+# ------------------ PAYPAL CONFIG ------------------
 paypalrestsdk.configure({
-    "mode": "sandbox", 
-    "client_id": "AYMfGaii6aYcdm7ZJPveVFWnl20Oqcxqpo3-Lr65XqxA08awlk0rWB2pY-CBiBz69p5s3aTLY9RlOD2c",
-    "client_secret": "EJk7lfd1KQHyHD2RqigyII7En7I_AWoeQ3icvUoZ3egVMCZZ-MpJDBfnUSSWPb4NhlDncGCPa9wTFnXM"
+    "mode": "sandbox",
+    "client_id": "AWkK0zZPsDl_dqfy1ARrkcGb_OTYuOQJH6aprgGTZxrJ4emsrqReTwYWlKqhbFdtKtUX-TEqgO_I-hyw",
+    "client_secret": "EP4bwQ6zIbheyDrH4q7lhSpV3L-qV3NeAhoLi7Z27MqJlCqawMcun18xoN-9oku15zKlvTkFwyFQhkkP"
 })
 
+# ------------------ VNPAY CONFIG ------------------
+VNP_TMN = "OBGZ0ZPP"
+VNP_SECRET = "HJAVSX9RF6QOB7WCAVRMACG52XHB43PD"
+VNP_URL = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+VNP_RETURN = f"{NGROK_HOST}/payments/vnpay-return/"
 
-# ------------------ PAYPAL ------------------
+# ==============================================================================
+# PAYPAL VIEWS
+# ==============================================================================
+
 def create_paypal_payment(request, order_id):
     try:
         order = Order.objects.get(order_id=order_id)
         
-        # Chuyển đổi VND sang USD
         total_vnd = order.total_amount
-        # Chia cho tỷ giá và làm tròn 2 chữ số thập phân (chuẩn USD)
-        total_usd = round(float(total_vnd) / USD_RATE, 2) 
-        
-        # Kiểm tra số tiền sau quy đổi (PayPal không chấp nhận 0 USD)
-        if total_usd <= 0:
-             return JsonResponse({"error": "Giá trị đơn hàng không hợp lệ cho thanh toán quốc tế"}, status=400)
+        total_usd = round(float(total_vnd) / USD_RATE, 2)
 
+        if total_usd <= 0:
+            # Fix trường hợp test giá trị nhỏ, PayPal yêu cầu tối thiểu > 0
+            total_usd = 1.00 
+
+        return_url = f"{NGROK_HOST}/payments/paypal-success"
+        cancel_url = f"{NGROK_HOST}/payments/paypal-cancel"
 
         payment = paypalrestsdk.Payment({
             "intent": "sale",
             "payer": {"payment_method": "paypal"},
             "redirect_urls": {
-                "return_url": "http://localhost:8000/payments/paypal-success",
-                "cancel_url": "http://localhost:8000/payments/paypal-cancel"
+                "return_url": return_url,
+                "cancel_url": cancel_url
             },
             "transactions": [{
                 "amount": {
                     "total": str(total_usd),
                     "currency": "USD"
                 },
-                "description": f"Thanh toán đơn hàng {order.order_id} (Giá trị VND: {total_vnd})"
+                "description": f"Thanh toan don hang #{order.order_id}"
             }]
         })
 
         if payment.create():
-            # Lưu tổng số tiền gốc (VND)
-            Payment.objects.create(
+            Payment.objects.update_or_create(
                 order=order,
-                amount=order.total_amount, 
-                payment_method='paypal',
-                transaction_id=payment.id,
-                status='pending'
+                defaults={
+                    "amount": order.total_amount,
+                    "payment_method": "paypal",
+                    "transaction_id": payment.id,
+                    "status": "pending"
+                }
             )
+
             for link in payment.links:
                 if link.rel == "approval_url":
-                    return JsonResponse({"url": link.href})
-        else:
-            return JsonResponse({"error": payment.error})
+                    return redirect(link.href)
+
+        return JsonResponse({"error": payment.error})
+
     except Order.DoesNotExist:
         return JsonResponse({"error": "Order not found"}, status=404)
-
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
 
 @csrf_exempt
 def paypal_success(request):
@@ -74,50 +97,44 @@ def paypal_success(request):
     payer_id = request.GET.get("PayerID")
 
     if not payment_id or not payer_id:
-        return JsonResponse({"error": "Thiếu thông tin từ PayPal"}, status=400)
+        return DeepLinkRedirect("myapp://payment-return?status=error&message=MissingParams")
 
     payment = paypalrestsdk.Payment.find(payment_id)
 
     if payment.execute({"payer_id": payer_id}):
         try:
             local_payment = Payment.objects.get(transaction_id=payment_id)
+            order = local_payment.order
+
             local_payment.status = "completed"
             local_payment.paid_at = timezone.now()
             local_payment.save()
 
-            # Cập nhật trạng thái Order
-            order = local_payment.order
-            order.status = "completed"
+            order.status = "paid"
+            order.payment_status = "paid"
             order.save()
+            order.sub_orders.all().update(status='paid')
 
         except Payment.DoesNotExist:
-            return JsonResponse({"error": "Không tìm thấy giao dịch trong hệ thống"}, status=404)
+            return DeepLinkRedirect("myapp://payment-return?status=error&message=PaymentNotFound")
 
-        return JsonResponse({"message": "Thanh toan PayPal thanh cong"})
-    else:
-        return JsonResponse({"error": payment.error}, status=400)
+        return DeepLinkRedirect(f"myapp://payment-return?status=success&order_id={order.order_id}")
 
+    return DeepLinkRedirect("myapp://payment-return?status=failed")
 
 @csrf_exempt
 def paypal_cancel(request):
-    return JsonResponse({"message": "Thanh toán đã bị hủy bởi người dùng."})
+    return DeepLinkRedirect("myapp://payment-return?status=cancelled")
 
 
-
-# --- VNPAY CONFIGURATION ---
-NGROK_HOST = "https://successive-idella-unsparingly.ngrok-free.dev"
-VNP_TMN = "B5NWYVN8"
-VNP_SECRET = "69UMHE0QCA5OI0IDGYWNBCB8I9I553IA"
-VNP_URL = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
-VNP_RETURN = f"{NGROK_HOST}/payments/vnpay-return/"
-VNP_IPN_URL = f"{NGROK_HOST}/payments/vnpay-ipn/" 
+# ==============================================================================
+# VNPAY VIEWS & HELPERS
+# ==============================================================================
 
 def _norm(v):
-    # Chuẩn hoá giá trị: chuyển sang string và strip spaces thừa
     return "" if v is None else str(v).strip()
 
 def _get_vnpay_hash(data, secret_key):
-    """Tính toán Secure Hash chuẩn VNPAY (URI Encode giá trị, Lọc rỗng, sắp xếp, SHA512)"""
     data_to_hash = {}
     for k, v in data.items():
         if k not in ["vnp_SecureHash", "vnp_SecureHashType"]:
@@ -126,25 +143,27 @@ def _get_vnpay_hash(data, secret_key):
                 data_to_hash[k] = normalized_v
 
     sorted_items = sorted(data_to_hash.items())
-    
-    hash_data_list = []
-    for k, v in sorted_items:
-        # Sử dụng quote_plus để mã hóa giá trị (Value) theo chuẩn VNPAY (khoảng trắng thành +)
-        encoded_value = urllib.parse.quote_plus(v)
-        hash_data_list.append(f"{k}={encoded_value}")
-
-    hash_data = "&".join(hash_data_list) # Chuỗi hash data đã được mã hóa giá trị
+    hash_data_list = [f"{k}={urllib.parse.quote_plus(v)}" for k, v in sorted_items]
+    hash_data = "&".join(hash_data_list)
     
     secure_hash = hmac.new(
-        secret_key.encode('utf-8'), 
-        hash_data.encode('utf-8'), 
+        secret_key.encode('utf-8'),
+        hash_data.encode('utf-8'),
         hashlib.sha512
     ).hexdigest().upper()
     
     return secure_hash
 
-# --- CREATE PAYMENT URL ---
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
 def create_vnpay_payment(request, order_id):
+    print(f"🚀 Đang xử lý VNPAY cho Order ID: {order_id}")
     try:
         order = Order.objects.get(order_id=order_id)
     except Order.DoesNotExist:
@@ -152,11 +171,12 @@ def create_vnpay_payment(request, order_id):
 
     vnp_Amount = int(order.total_amount * 100)
     vnp_TxnRef = str(order.order_id)
-    
-    # Loại bỏ khoảng trắng để tránh lỗi encoding trong hash
-    vnp_OrderInfo = f"THANH_TOAN_DON_HANG_{order.order_id}" 
+    vnp_OrderInfo = f"Thanh toan don hang {order.order_id}"
     vnp_CreateDate = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     vnp_ExpireDate = (datetime.datetime.now() + datetime.timedelta(minutes=15)).strftime("%Y%m%d%H%M%S")
+    
+    # Lấy IP thực
+    ip_addr = get_client_ip(request)
 
     inputData = {
         "vnp_Version": "2.1.0",
@@ -169,28 +189,36 @@ def create_vnpay_payment(request, order_id):
         "vnp_OrderType": "other",
         "vnp_Locale": "vn",
         "vnp_ReturnUrl": VNP_RETURN,
-        "vnp_IpAddr": "127.0.0.1",
+        "vnp_IpAddr": ip_addr, 
         "vnp_CreateDate": vnp_CreateDate,
         "vnp_ExpireDate": vnp_ExpireDate,
     }
 
-    # Tính hash
+    # 1. Tạo Hash
     secure_hash = _get_vnpay_hash(inputData, VNP_SECRET)
-
-    query_string = urllib.parse.urlencode(inputData, quote_via=urllib.parse.quote)
+    
+    # 2. Sắp xếp dữ liệu để tạo Query String (Quan trọng: Phải sort giống lúc tạo Hash)
+    # Nếu không sort, VNPAY sẽ báo lỗi sai chữ ký
+    sorted_inputData = sorted(inputData.items())
+    query_string = urllib.parse.urlencode(sorted_inputData, quote_via=urllib.parse.quote)
+    
+    # 3. Tạo Full URL
     payment_url = f"{VNP_URL}?{query_string}&vnp_SecureHashType=HMACSHA512&vnp_SecureHash={secure_hash}"
 
-    Payment.objects.create(
+    print(f"🔗 Redirecting to: {payment_url}")
+
+    # 4. Lưu Payment
+    Payment.objects.update_or_create(
         order=order,
-        amount=order.total_amount,
-        payment_method='vnpay',
-        transaction_id=vnp_TxnRef, # Dùng TxnRef làm ID tạm thời
-        status='pending'
+        defaults={
+            "amount": order.total_amount,
+            "payment_method": "vnpay",
+            "transaction_id": vnp_TxnRef,
+            "status": "pending"
+        }
     )
     
-    return JsonResponse({"payment_url": payment_url})
-
-# --- VNPAY RETURN URL (Client-side) ---
+    return redirect(payment_url)
 
 @csrf_exempt
 def vnpay_return(request):
@@ -199,25 +227,42 @@ def vnpay_return(request):
     vnp_ResponseCode = inputData.get("vnp_ResponseCode")
     vnp_secure_recv = inputData.get("vnp_SecureHash", "").upper()
 
-    # Kiểm tra chữ ký
     secure_calc = _get_vnpay_hash(inputData, VNP_SECRET)
     
     if secure_calc != vnp_secure_recv:
-        return JsonResponse({"status": "error", "code": "97", "message": "Sai chữ ký (Invalid Signature)"}, status=400)
-    
-    # Xử lý sau khi chữ ký hợp lệ (Kiểm tra xem đơn hàng có tồn tại không)
-    try:
-        Payment.objects.get(order__order_id=vnp_TxnRef)
-    except Payment.DoesNotExist:
-        return JsonResponse({"status": "error", "code": "01", "message": "Không tìm thấy giao dịch"}, status=404)
-    
-    # Trả về kết quả thanh toán
-    if vnp_ResponseCode == "00":
-        return JsonResponse({"status": "success", "code": "00", "message": "Thanh toan thanh cong"})
-    else:
-        return JsonResponse({"status": "failed", "code": vnp_ResponseCode, "message": "Thanh toán thất bại"})
+        print("❌ VNPAY: Sai chữ ký!")
+        return DeepLinkRedirect("myapp://payment-return?status=error&message=InvalidSignature")
 
-# --- VNPAY IPN URL (Server-to-Server) ---
+    try:
+        payment = Payment.objects.get(order__order_id=vnp_TxnRef)
+        order = payment.order
+    except Payment.DoesNotExist:
+        return DeepLinkRedirect("myapp://payment-return?status=error&message=PaymentNotFound")
+
+    if vnp_ResponseCode == "00":
+        print(f"✅ VNPAY: Thanh toán thành công đơn {vnp_TxnRef}")
+        payment.status = "completed"
+        payment.paid_at = timezone.now()
+        payment.save()
+        
+        order.status = "paid"
+        order.payment_status = "paid"
+        order.save()
+        order.sub_orders.all().update(status='paid')
+        
+        return DeepLinkRedirect(f"myapp://payment-return?status=success&order_id={vnp_TxnRef}")
+        
+    elif vnp_ResponseCode == "24":
+        print("⚠️ VNPAY: Người dùng hủy")
+        payment.status = "failed"
+        payment.save()
+        return DeepLinkRedirect("myapp://payment-return?status=cancelled")
+    else:
+        print(f"❌ VNPAY: Lỗi {vnp_ResponseCode}")
+        payment.status = "failed"
+        payment.save()
+        return DeepLinkRedirect(f"myapp://payment-return?status=failed&vnp_ResponseCode={vnp_ResponseCode}")
+
 @csrf_exempt
 def vnpay_ipn(request):
     inputData = request.GET
@@ -227,13 +272,11 @@ def vnpay_ipn(request):
     vnp_Amount_recv = inputData.get("vnp_Amount")
     vnp_secure_recv = inputData.get("vnp_SecureHash", "").upper()
 
-    # Kiểm tra chữ ký
     secure_calc = _get_vnpay_hash(inputData, VNP_SECRET)
     
     if secure_calc != vnp_secure_recv:
         return JsonResponse({'RspCode': '97', 'Message': 'Invalid Signature'})
 
-    # Kiểm tra Đơn hàng và Số tiền
     try:
         local_payment = Payment.objects.get(order__order_id=vnp_TxnRef)
         local_order = local_payment.order
@@ -243,34 +286,24 @@ def vnpay_ipn(request):
     if local_payment.status == "completed":
         return JsonResponse({'RspCode': '02', 'Message': 'Order already confirmed'})
 
-    # Chuyển đổi total_amount (Decimal) sang string để so sánh an toàn
-    # Chúng ta nhân 100 và dùng str() để so sánh với chuỗi VNPAY gửi về
-    # Phép nhân 100 sẽ tự động xử lý Decimal, sau đó str() chuyển thành chuỗi
+    # Chuyển Decimal thành string số nguyên để so sánh
     local_amount_vnd_str = str(int(local_order.total_amount * 100))
-    
-    # Kiểm tra số tiền VNPAY gửi về có khớp với số tiền đơn hàng không
+
     if local_amount_vnd_str != vnp_Amount_recv:
         return JsonResponse({'RspCode': '04', 'Message': 'Invalid amount'})
 
-    # Cập nhật kết quả 
     if vnp_ResponseCode == "00":
         local_payment.status = "completed"
         local_payment.paid_at = timezone.now()
         local_payment.transaction_id = vnp_TransactionNo
         local_payment.save()
-        local_order.status = "completed"
+        
+        local_order.status = "paid"
+        local_order.payment_status = "paid"
         local_order.save()
+        local_order.sub_orders.all().update(status='paid')
     else:
-        # Giao dịch thất bại (Khác 00)
         local_payment.status = "failed"
         local_payment.save()
         
-    # Trả về 00 để VNPAY kết thúc luồng IPN (Confirm Success)
     return JsonResponse({'RspCode': '00', 'Message': 'Confirm Success'})
-
-def test_payment_page(request):
-    """
-    Trang mẫu để test thanh toán.
-    Giao diện cho phép nhập order_id và gọi PayPal/VNPay endpoints.
-    """
-    return render(request, "payments/test_payment.html", {})

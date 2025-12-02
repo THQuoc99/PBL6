@@ -5,23 +5,17 @@ import 'package:flutter_app/shop/models/product_variant_model.dart';
 class VariationController extends GetxController {
   static VariationController get instance => Get.find();
 
-  // Lưu trạng thái đã chọn: {"Màu sắc": "Đỏ", "Kích cỡ": "39"}
   final selectedAttributes = <String, String>{}.obs;
-  
   final variationStockStatus = ''.obs; 
   final selectedVariant = Rx<ProductVariantModel?>(null);
 
-  // ✅ Hàm quan trọng: Quét variants để lấy danh sách thuộc tính có sẵn
-  Map<String, Set<String>> getAvailableAttributes(ProductModel product) {
+  // 1. Lấy danh sách thuộc tính để render UI (Chip)
+  Map<String, Set<String>> getUniqueAttributes(ProductModel product) {
     Map<String, Set<String>> attributes = {};
 
-    if (product.variants.isEmpty) return attributes;
-
     for (var variant in product.variants) {
-      // Chỉ lấy thuộc tính của các variant còn hàng (stock > 0)
-      if (variant.stock > 0) {
-        variant.attributes.forEach((key, value) {
-          // key: "Màu sắc", value: "Đỏ"
+      if (variant.stock > 0) { // Chỉ hiện attribute của sp còn hàng
+        variant.attributeCombinations.forEach((key, value) {
           if (!attributes.containsKey(key)) {
             attributes[key] = {};
           }
@@ -32,45 +26,53 @@ class VariationController extends GetxController {
     return attributes;
   }
 
-  // Khi người dùng chọn 1 chip
+  // 2. Xử lý chọn Chip
   void onAttributeSelected(ProductModel product, String attributeName, String attributeValue) {
-    // 1. Cập nhật map đã chọn
-    selectedAttributes[attributeName] = attributeValue;
+    if (selectedAttributes[attributeName] == attributeValue) {
+      selectedAttributes.remove(attributeName); // Bỏ chọn
+    } else {
+      selectedAttributes[attributeName] = attributeValue; // Chọn mới
+    }
+    _updateSelectedVariant(product);
+  }
 
-    // 2. Tìm variant khớp với TẤT CẢ các thuộc tính đã chọn
+  // 3. Tìm biến thể khớp
+  void _updateSelectedVariant(ProductModel product) {
+    // Tìm variant khớp với TẤT CẢ thuộc tính đã chọn
     final matchingVariant = product.variants.firstWhereOrNull((variant) {
       bool isMatch = true;
-      // Kiểm tra từng thuộc tính đã chọn xem variant này có khớp không
-      selectedAttributes.forEach((key, value) {
-        if (variant.attributes[key] != value) {
+      for (var entry in selectedAttributes.entries) {
+        // So sánh String vs String trong Map
+        if (variant.attributeCombinations[entry.key] != entry.value) {
           isMatch = false;
+          break;
         }
-      });
+      }
       return isMatch;
     });
 
-    // 3. Cập nhật UI
     if (matchingVariant != null) {
-      // Nếu tìm thấy variant khớp hoàn toàn
-      // Kiểm tra xem người dùng đã chọn ĐỦ thuộc tính chưa?
-      // (Ví dụ sản phẩm có Màu + Size, nhưng mới chọn Màu -> chưa xác định được variant cuối cùng)
-      // Logic đơn giản: Nếu số lượng thuộc tính đã chọn == số lượng key trong variant -> Đã chọn xong
-      if (selectedAttributes.length == matchingVariant.attributes.length) {
-         selectedVariant.value = matchingVariant;
-         variationStockStatus.value = 'Kho: ${matchingVariant.stock}';
+      // Kiểm tra đã chọn ĐỦ thuộc tính chưa
+      final requiredCount = getUniqueAttributes(product).keys.length;
+      
+      if (selectedAttributes.length == requiredCount) {
+        // Found!
+        selectedVariant.value = matchingVariant;
+        variationStockStatus.value = 'Kho: ${matchingVariant.stock}';
       } else {
-         // Chưa chọn đủ (mới chọn Màu, chưa chọn Size)
-         selectedVariant.value = null;
-         variationStockStatus.value = 'Vui lòng chọn thêm thuộc tính';
+        // Chưa chọn đủ
+        selectedVariant.value = null;
+        variationStockStatus.value = 'Vui lòng chọn đủ thông tin';
       }
     } else {
+      // Chọn attribute không khớp (VD: Màu Đỏ + Size 45 không có)
       selectedVariant.value = null;
-      variationStockStatus.value = 'Phiên bản này không có hàng';
-      // Có thể thêm logic reset lựa chọn nếu muốn
+      variationStockStatus.value = 'Hết hàng';
+      // Optional: Reset lựa chọn vừa rồi nếu muốn UX chặt chẽ hơn
     }
   }
   
-  // Reset khi vào màn hình mới
+  // Gọi hàm này khi vào trang chi tiết hoặc rời đi
   void reset() {
     selectedAttributes.clear();
     variationStockStatus.value = '';

@@ -12,6 +12,7 @@ import 'package:flutter_app/features/shop/screens/checkout/widgets/billing_amoun
 import 'widgets/billing_payment_section.dart';
 import 'package:flutter_app/shop/controllers/cart_controller.dart';
 import 'package:flutter_app/shop/controllers/order_controller.dart';
+import 'package:flutter_app/shop/controllers/address_controller.dart'; // Import AddressController
 
 class CheckoutScreen extends StatelessWidget {
   const CheckoutScreen({super.key});
@@ -19,8 +20,9 @@ class CheckoutScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = HelperFunction.isDarkMode(context);
-    final cartController = Get.find<CartController>();
-    final orderController = Get.put(OrderController()); // Init Order Controller
+    final cartController = Get.put(CartController()); 
+    Get.put(AddressController());
+    final orderController = Get.put(OrderController());
 
     return Scaffold(
       appBar: CusAppbar(
@@ -33,7 +35,6 @@ class CheckoutScreen extends StatelessWidget {
           child: Column(
             children: [
               // 1. List Items (Chỉ hiện những món được chọn)
-              // Lưu ý: Bạn cần sửa CartItems để có chế độ hiển thị "selected only" hoặc lọc trước khi truyền vào
               const CartItems(showAddRemoveButtons: false), 
               const SizedBox(height: AppSizes.spaceBtwSections),
 
@@ -48,18 +49,18 @@ class CheckoutScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(AppSizes.md),
                 child: const Column(
                   children: [
-                    BillingAmountSection(), // Cần sửa widget này để lấy total từ CartController
+                    BillingAmountSection(), 
                     SizedBox(height: AppSizes.spaceBtwItems),
                     Divider(),
                     SizedBox(height: AppSizes.spaceBtwItems),
                     
-                    BillingPaymentSection(), // Chọn VNPAY/PayPal
+                    BillingPaymentSection(), 
                     
                     SizedBox(height: AppSizes.spaceBtwItems),
                     Divider(),
                     SizedBox(height: AppSizes.spaceBtwItems),
                     
-                    BillingAddressSection() // Chọn địa chỉ
+                    BillingAddressSection() 
                   ],
                 ),
               )
@@ -77,7 +78,11 @@ class CheckoutScreen extends StatelessWidget {
               ? null 
               : () => orderController.processOrder(),
           child: orderController.isLoading.value
-              ? const CircularProgressIndicator(color: Colors.white)
+              ? const SizedBox(
+                  width: 20, 
+                  height: 20, 
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                )
               : Text('Checkout \$${cartController.totalAmount.value.toStringAsFixed(0)}'),
         )),
       ),

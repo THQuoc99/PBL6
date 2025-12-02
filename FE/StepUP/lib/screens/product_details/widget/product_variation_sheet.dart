@@ -7,6 +7,8 @@ import 'package:flutter_app/shop/controllers/cart_controller.dart';
 import 'package:flutter_app/shop/controllers/product_variation_controller.dart';
 import 'package:flutter_app/widgets/containers/rounded_container.dart';
 import 'package:flutter_app/screens/product_details/widget/choice_chip.dart'; 
+import 'package:flutter_app/features/shop/screens/cart/cart.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 
 enum SheetMode { addToCart, buyNow }
 
@@ -22,12 +24,14 @@ class ProductVariationSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(VariationController());
+    // Sử dụng tag để tránh xung đột controller nếu mở nhiều sheet
+    final controller = Get.put(VariationController(), tag: product.id.toString());
+    
+    // Reset controller khi sheet được dựng xong
     WidgetsBinding.instance.addPostFrameCallback((_) => controller.reset());
 
-    final availableAttributes = controller.getAvailableAttributes(product);
+    final uniqueAttributes = controller.getUniqueAttributes(product);
 
-    // Xử lý ảnh
     String imageUrl = product.image ?? "";
     if (imageUrl.startsWith("/media")) {
       imageUrl = "http://10.0.2.2:8000$imageUrl";
@@ -39,58 +43,39 @@ class ProductVariationSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- 1. Header: Ảnh + Tên + Giá + SKU ---
+          // --- 1. HEADER ---
           Row(
             children: [
-              // Ảnh sản phẩm
               RoundedContainer(
-                height: 80,
-                width: 80,
+                height: 80, width: 80,
                 padding: const EdgeInsets.all(AppSizes.sm),
                 bgcolor: AppColors.light,
                 child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
+                  imageUrl, fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => const Icon(Icons.image),
                 ),
               ),
               const SizedBox(width: AppSizes.spaceBtwItems),
-
-              // Thông tin bên phải ảnh
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Tên sản phẩm
-                    Text(
-                      product.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
+                    Text(product.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
-
-                    // Giá (Thay đổi khi chọn variant)
-                    Obx(() {
-                      final price = controller.selectedVariant.value?.price ?? product.price;
-                      return Text(
-                        '\$${price.toStringAsFixed(0)}',
-                        style: Theme.of(context).textTheme.headlineSmall!.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold
-                        ),
-                      );
-                    }),
-
-                    // Trạng thái kho / SKU
                     Obx(() {
                       final variant = controller.selectedVariant.value;
-                      if (variant != null) {
-                        return Text("SKU: ${variant.sku} (Kho: ${variant.stock})", 
-                          style: Theme.of(context).textTheme.labelMedium);
-                      }
-                      return const Text("Vui lòng chọn phân loại", 
-                          style: TextStyle(color: Colors.grey));
+                      final priceToShow = variant != null ? variant.price : product.price;
+                      final stockText = controller.variationStockStatus.value;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('\$${priceToShow.toStringAsFixed(0)}', 
+                              style: Theme.of(context).textTheme.headlineSmall!.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          if (uniqueAttributes.isNotEmpty && stockText.isNotEmpty)
+                            Text(stockText, style: Theme.of(context).textTheme.labelMedium),
+                        ],
+                      );
                     }),
                   ],
                 ),
@@ -99,9 +84,9 @@ class ProductVariationSheet extends StatelessWidget {
           ),
           const SizedBox(height: AppSizes.spaceBtwSections),
 
-          // --- 2. DANH SÁCH THUỘC TÍNH (MÀU, SIZE) ---
-          if (availableAttributes.isNotEmpty)
-            ...availableAttributes.entries.map((entry) {
+          // --- 2. DANH SÁCH THUỘC TÍNH ---
+          if (uniqueAttributes.isNotEmpty)
+            ...uniqueAttributes.entries.map((entry) {
               final attributeName = entry.key;
               final attributeValues = entry.value.toList();
 
@@ -117,11 +102,7 @@ class ProductVariationSheet extends StatelessWidget {
                       return MyChoiceChip(
                         text: value,
                         selected: isSelected,
-                        onSelected: (selected) {
-                          if (selected) {
-                            controller.onAttributeSelected(product, attributeName, value);
-                          }
-                        },
+                        onSelected: (selected) => controller.onAttributeSelected(product, attributeName, value),
                       );
                     }).toList(),
                   )),
@@ -129,31 +110,58 @@ class ProductVariationSheet extends StatelessWidget {
                 ],
               );
             }).toList()
-          else
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 10),
-              child: Text("Sản phẩm này không có tùy chọn nào."),
-            ),
+          else 
+             const Padding(
+               padding: EdgeInsets.symmetric(vertical: 10),
+               child: Text("Sản phẩm tiêu chuẩn (Không có tùy chọn)."),
+             ),
 
           const SizedBox(height: AppSizes.spaceBtwSections),
 
-          // --- 3. Nút Action ---
+          // --- 3. NÚT ACTION ---
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                final variant = controller.selectedVariant.value;
+                final cartController = Get.put(CartController());
                 
-                if (availableAttributes.isNotEmpty && variant == null) {
-                  Get.snackbar('Thông báo', 'Vui lòng chọn đầy đủ thuộc tính', 
-                      snackPosition: SnackPosition.BOTTOM, margin: const EdgeInsets.all(10));
+                // --- LOGIC KIỂM TRA ---
+                if (uniqueAttributes.isNotEmpty) {
+                  final variant = controller.selectedVariant.value;
+                  
+                  // Check 1: Đã chọn đủ thuộc tính chưa?
+                  if (controller.selectedAttributes.length < uniqueAttributes.keys.length) {
+                      _showSnackbar('Chưa chọn đủ thông tin', 'Vui lòng chọn đầy đủ Màu sắc/Kích thước', isError: true);
+                      return;
+                  }
+                  
+                  // Check 2: Biến thể có tồn tại không?
+                  if (variant == null) {
+                      _showSnackbar('Lỗi', 'Phiên bản này không tồn tại', isError: true);
+                      return;
+                  }
+
+                  // Check 3: Kiểm tra tồn kho
+                  if (variant.stock <= 0) {
+                      _showSnackbar('Hết hàng', 'Sản phẩm này đã hết hàng trong kho', isError: true);
+                      return; 
+                  }
+
+                  // Nếu ok -> Thêm vào giỏ
+                  cartController.addToCart(variant.id, 1);
+                } else {
+                  // Sản phẩm không biến thể
+                  _showSnackbar('Thông báo', 'Sản phẩm này không có biến thể');
                   return;
                 }
 
-                if (variant != null) {
-                  final cartController = Get.put(CartController());
-                  cartController.addToCart(variant.id, 1);
-                  Navigator.pop(context);
+                // --- XỬ LÝ SAU KHI THÊM THÀNH CÔNG ---
+                Get.back(); // Đóng sheet
+
+                if (mode == SheetMode.buyNow) {
+                  Get.to(() => const CartScreen());
+                } else {
+                  _showSnackbar('Thành công', 'Đã thêm vào giỏ hàng', isSuccess: true);
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -161,13 +169,37 @@ class ProductVariationSheet extends StatelessWidget {
                 padding: const EdgeInsets.all(AppSizes.md),
               ),
               child: Text(
-                mode == SheetMode.buyNow ? 'Buy Now' : 'Add to Cart',
+                mode == SheetMode.buyNow ? 'Buy now' : 'Add to cart',
                 style: const TextStyle(color: Colors.white),
               ),
             ),
           )
         ],
       ),
+    );
+  }
+
+  // Hàm wrapper để hiện Snackbar an toàn
+  void _showSnackbar(String title, String message, {bool isError = false, bool isSuccess = false}) {
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: SnackPosition.TOP, // Hiện ở trên cùng để tránh bị che
+      backgroundColor: isError 
+          ? Colors.red.withOpacity(0.9) 
+          : (isSuccess ? Colors.green.withOpacity(0.9) : Colors.grey.withOpacity(0.9)),
+      colorText: Colors.white,
+      margin: const EdgeInsets.all(10),
+      borderRadius: 10,
+      duration: const Duration(seconds: 2),
+      icon: Icon(
+        isError ? Iconsax.warning_2 : (isSuccess ? Iconsax.tick_circle : Iconsax.info_circle),
+        color: Colors.white,
+      ),
+      // Quan trọng: Đảm bảo nó nằm trên các UI khác
+      isDismissible: true,
+      dismissDirection: DismissDirection.horizontal,
+      forwardAnimationCurve: Curves.easeOutBack,
     );
   }
 }

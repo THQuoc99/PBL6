@@ -8,7 +8,9 @@ class AuthService {
   final String baseUrl = "http://10.0.2.2:8000";
   
   // Tìm UserController (đảm bảo controller này đã được Get.put ở main hoặc binding)
-  final UserController userController = Get.put(UserController());
+  final UserController userController = Get.isRegistered<UserController>() 
+      ? Get.find<UserController>() 
+      : Get.put(UserController());
 
   // Hàm tiện ích lưu token
   Future<void> saveToken(String token) async {
@@ -66,20 +68,27 @@ class AuthService {
     required String password2,
     required String fullName,
     required String phone,
+    String? birthDate, // (Tùy chọn) Thêm ngày sinh lúc đăng ký
   }) async {
     try {
+      final Map<String, dynamic> body = {
+        'username': username,
+        'email': email,
+        'password': password,
+        'password2': password2,
+        'full_name': fullName,
+        'phone': phone,
+        'role': 'buyer'
+      };
+
+      if (birthDate != null) {
+        body['birth_date'] = birthDate;
+      }
+
       final response = await http.post(
         Uri.parse('$baseUrl/api/users/register/'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'username': username,
-          'email': email,
-          'password': password,
-          'password2': password2,
-          'full_name': fullName,
-          'phone': phone,
-          'role': 'buyer'
-        }),
+        body: json.encode(body),
       );
       
       final data = json.decode(utf8.decode(response.bodyBytes));
@@ -119,14 +128,15 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
     // Xóa thông tin User khỏi Controller
-    // userController.clearUser(); // Bỏ comment nếu hàm này có trong controller
+    userController.clearUser(); 
   }
 
-  // 6. CẬP NHẬT PROFILE
+  // 6. CẬP NHẬT PROFILE (ĐÃ SỬA)
    Future<Map<String, dynamic>> updateProfile({
     String? fullName,
     String? phone,
     String? email,
+    String? birthDate, // <--- ĐÃ THÊM: Tham số này còn thiếu
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
@@ -141,7 +151,12 @@ class AuthService {
       if (fullName != null) body['full_name'] = fullName;
       if (phone != null) body['phone'] = phone;
       if (email != null) body['email'] = email;
-
+      
+      // <--- ĐÃ THÊM: Logic đóng gói birth_date gửi lên server
+      if (birthDate != null && birthDate.isNotEmpty) {
+        body['birth_date'] = birthDate;
+      }
+      print("📤 Đang gửi lên server: $body");
       final response = await http.patch( // Sử dụng PATCH
         Uri.parse('$baseUrl/api/users/profile/'),
         headers: {
@@ -154,9 +169,8 @@ class AuthService {
       final data = json.decode(utf8.decode(response.bodyBytes)); 
 
       if (response.statusCode == 200) {
-        // Cập nhật lại UserController với dữ liệu mới
-        // Backend trả về {full_name, phone, email}
-        // await userController.updateSomeData(data); // Bỏ comment nếu hàm này có
+        // Backend trả về {full_name, phone, email, birth_date...}
+        // Cập nhật lại UserController nếu cần thiết (nhưng EditProfileScreen đã làm việc này rồi)
         
         return {'success': true, 'message': 'Cập nhật thành công!'};
       }

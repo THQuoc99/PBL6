@@ -1,49 +1,24 @@
 from django.contrib import admin
-from .models import Province, District, Ward, Hamlet, Address, Order, SubOrder, OrderItem
+from .models import Order, SubOrder, OrderItem
 
-@admin.register(Province)
-class ProvinceAdmin(admin.ModelAdmin):
-    list_display = ('province_id', 'name')
-    search_fields = ('name',)
+class OrderItemInline(admin.TabularInline):
+    model = OrderItem
+    extra = 0
+    readonly_fields = ['variant', 'quantity', 'price_at_order', 'discount_amount']
 
-@admin.register(District)
-class DistrictAdmin(admin.ModelAdmin):
-    list_display = ('district_id', 'name', 'province')
-    search_fields = ('name',)
-    list_filter = ('province',)
-
-@admin.register(Ward)
-class WardAdmin(admin.ModelAdmin):
-    list_display = ('ward_id', 'name', 'district')
-    search_fields = ('name',)
-    list_filter = ('district',)
-
-@admin.register(Hamlet)
-class HamletAdmin(admin.ModelAdmin):
-    list_display = ('hamlet_id', 'name', 'ward')
-    search_fields = ('name',)
-    list_filter = ('ward',)
-
-@admin.register(Address)
-class AddressAdmin(admin.ModelAdmin):
-    list_display = ('address_id', 'user', 'province', 'district', 'ward', 'is_default')
-    search_fields = ('user__username', 'detail')
-    list_filter = ('province', 'district', 'ward', 'is_default')
+class SubOrderInline(admin.StackedInline):
+    model = SubOrder
+    extra = 0
+    inlines = [OrderItemInline]
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('order_id', 'buyer', 'total_amount', 'status', 'created_at')
-    search_fields = ('buyer__username',)
-    list_filter = ('status', 'created_at')
+    list_display = ['order_id', 'buyer', 'total_amount', 'status', 'payment_status', 'created_at']
+    list_filter = ['status', 'payment_status', 'created_at']
+    search_fields = ['order_id', 'buyer__username']
+    inlines = [SubOrderInline]
 
 @admin.register(SubOrder)
 class SubOrderAdmin(admin.ModelAdmin):
-    list_display = ('sub_order_id', 'order', 'seller', 'total_amount', 'status', 'created_at')
-    search_fields = ('order__order_id', 'seller__username')
-    list_filter = ('status', 'created_at')
-
-@admin.register(OrderItem)
-class OrderItemAdmin(admin.ModelAdmin):
-    list_display = ('order_item_id', 'order', 'sub_order', 'variant', 'quantity', 'price_at_order')
-    search_fields = ('order__order_id', 'sub_order__sub_order_id', 'variant__sku')
-    list_filter = ('order', 'sub_order')
+    list_display = ['sub_order_id', 'order', 'store', 'subtotal', 'status']
+    list_filter = ['status', 'store']

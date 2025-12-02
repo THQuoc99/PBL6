@@ -8,11 +8,11 @@ class BillingAmountSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<CartController>();
+    final controller = Get.put(CartController());
 
     return Obx(() {
       final subTotal = controller.totalAmount.value;
-      final shippingFee = 25.0; // Phí ship cứng (hoặc lấy từ config)
+      final shippingFee = 0.0; // Phí ship cứng (hoặc lấy từ config)
       final taxFee = 0.0; // Thuế (nếu có)
       final total = subTotal + shippingFee + taxFee;
 

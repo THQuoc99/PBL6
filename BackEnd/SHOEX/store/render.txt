@@ -1,0 +1,15 @@
+Bây giờ triển khai graqhph cho store cho tôi 
+Triển khai những thứ tạo store 
+1,
+input :name,email,sdt, province,ward,hamlet,detail(chi tiết địa chỉ)
+ Những thứ khác tạm thời null
+ output : trả về store
+2,
+ map user-store lưu với role =owner
+ 3.Update profile 
+ input :name,email,phone,currency
+ out :store sau update
+4.Update avata,Update cover( hình ảnh sẽ được load lên) sau đó nhấn savasetting. 
+
+ Cập nhật ảnh bìa, avata,(logo bỏ qua không cần dùng),
+

@@ -21,7 +21,7 @@ class ProductAttribute extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     
     final controller = Get.put(VariationController());
-    final availableAttributes = controller.getAvailableAttributes(product);
+    final availableAttributes = controller.getUniqueAttributes(product);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

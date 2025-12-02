@@ -9,7 +9,7 @@ class CartController extends GetxController {
 
   final isLoading = false.obs;
   final cartItems = <CartItemModel>[].obs;
-  final totalAmount = 0.0.obs; // Tổng tiền (chỉ tính các món được chọn)
+  final totalAmount = 0.0.obs; 
 
   final String baseUrl = "http://10.0.2.2:8000/api/cart";
 
@@ -19,24 +19,22 @@ class CartController extends GetxController {
     super.onInit();
   }
 
-  // ✅ HÀM MỚI: Tính lại tổng tiền dựa trên các món được tích chọn
   void updateCartTotal() {
     double total = 0.0;
     for (var item in cartItems) {
       if (item.isSelected.value) {
-        total += item.price * item.quantity;
+        // Ưu tiên dùng subTotal backend tính sẵn, nếu không thì tự nhân
+        total += (item.subTotal > 0) ? item.subTotal : (item.price * item.quantity);
       }
     }
     totalAmount.value = total;
   }
 
-  // ✅ HÀM MỚI: Xử lý khi tích/bỏ tích một món
   void toggleSelection(int index) {
-    cartItems[index].isSelected.toggle(); // Đảo ngược trạng thái true/false
-    updateCartTotal(); // Tính lại tiền ngay lập tức
+    cartItems[index].isSelected.toggle();
+    updateCartTotal();
   }
   
-  // ✅ HÀM MỚI: Chọn tất cả / Bỏ chọn tất cả (Nếu cần dùng sau này)
   void toggleAll(bool value) {
     for (var item in cartItems) {
       item.isSelected.value = value;
@@ -44,7 +42,7 @@ class CartController extends GetxController {
     updateCartTotal();
   }
 
-  // ✅ HÀM MỚI: Lấy danh sách các món ĐƯỢC CHỌN để checkout
+  // Helper lấy danh sách để Checkout
   List<CartItemModel> get selectedItems => cartItems.where((item) => item.isSelected.value).toList();
 
   Future<void> fetchCart() async {
@@ -52,7 +50,6 @@ class CartController extends GetxController {
       isLoading.value = true;
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
-      
       if (token == null) return;
 
       final response = await http.get(
@@ -66,7 +63,6 @@ class CartController extends GetxController {
           final List items = data['items'];
           cartItems.value = items.map((e) => CartItemModel.fromJson(e)).toList();
         }
-        // Sau khi load xong, tính lại tổng tiền theo logic chọn (mặc định chọn hết)
         updateCartTotal();
       }
     } catch (e) {
@@ -97,12 +93,13 @@ class CartController extends GetxController {
         }),
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         Get.snackbar('Thành công', 'Đã thêm vào giỏ hàng', 
           snackPosition: SnackPosition.BOTTOM);
-        fetchCart(); // Tải lại giỏ để cập nhật số lượng trên icon (nếu có)
+        fetchCart(); 
       } else {
-        Get.snackbar('Lỗi', 'Không thể thêm: ${response.body}');
+        var msg = json.decode(response.body)['error'] ?? 'Lỗi không xác định';
+        Get.snackbar('Lỗi', msg);
       }
     } catch (e) {
       print(e);
@@ -110,12 +107,12 @@ class CartController extends GetxController {
   }
 
   Future<void> updateQuantity(int itemId, int newQuantity) async {
-    // Optimistic update (Cập nhật UI trước cho mượt)
+    // Optimistic update
     final index = cartItems.indexWhere((item) => item.itemId == itemId);
     if (index != -1) {
       cartItems[index].quantity = newQuantity;
-      cartItems.refresh(); // Báo cho UI biết list đã thay đổi
-      updateCartTotal(); // ✅ Tính lại tiền ngay lập tức
+      cartItems.refresh(); 
+      updateCartTotal(); 
     }
 
     try {
@@ -130,11 +127,9 @@ class CartController extends GetxController {
         },
         body: json.encode({'quantity': newQuantity}),
       );
-      
-      // Không cần fetchCart lại nếu chỉ update số lượng để tránh giật lag
     } catch (e) {
       print("Lỗi update: $e");
-      fetchCart(); // Revert nếu lỗi
+      fetchCart(); // Revert
     }
   }
 
@@ -148,7 +143,6 @@ class CartController extends GetxController {
         headers: {'Authorization': 'Bearer $token'},
       );
       
-      // Xóa local trước cho mượt
       cartItems.removeWhere((item) => item.itemId == itemId);
       updateCartTotal();
       

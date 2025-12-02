@@ -5,7 +5,6 @@ import 'package:flutter_app/widgets/layouts/grid_layout.dart';
 import 'package:flutter_app/widgets/products/product_cards/product_card_vertical.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:get/get.dart';
-
 import 'package:flutter_app/shop/controllers/all_products_controller.dart';
 
 class AllProducts extends StatelessWidget {
@@ -22,21 +21,21 @@ class AllProducts extends StatelessWidget {
           padding: const EdgeInsets.all(AppSizes.defaultSpace),
           child: Column(
             children: [
-              DropdownButtonFormField(
+              // ✅ SỬA LỖI: Bọc Dropdown trong Obx để cập nhật giá trị sort
+              Obx(() => DropdownButtonFormField<String>(
                 decoration: const InputDecoration(prefixIcon: Icon(Iconsax.sort)),
-                value: 'Name', // Giá trị mặc định
+                value: controller.selectedSortOption.value, 
                 onChanged: (value) {
                   if (value != null) {
-                    controller.sortProducts(value.toString());
+                    controller.sortProducts(value);
                   }
                 },
                 items: ['Name', 'Price', 'Sale']
                     .map((option) => DropdownMenuItem(value: option, child: Text(option)))
                     .toList(),
-              ),
+              )),
               const SizedBox(height: AppSizes.spaceBtwItems,),
 
-              // ✅ Product List: Dùng Obx để lắng nghe dữ liệu
               Obx(() {
                 if (controller.isLoading.value) {
                   return const Center(child: CircularProgressIndicator());

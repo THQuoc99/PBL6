@@ -11,7 +11,6 @@ import 'package:flutter_app/widgets/texts/product_price_text.dart';
 import 'package:get/get.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-// ✅ Import WishlistController
 import 'package:flutter_app/shop/controllers/wishlist_controller.dart';
 
 class ProductCardVertical extends StatelessWidget {
@@ -24,21 +23,22 @@ class ProductCardVertical extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ✅ Khởi tạo Controller để quản lý yêu thích
     final wishlistController = Get.put(WishlistController());
 
+    // Xử lý URL ảnh
     String imageUrl = product.image ?? "";
     if (imageUrl.startsWith("/media")) {
       imageUrl = "http://10.0.2.2:8000$imageUrl";
     }
     final isNetworkImage = imageUrl.startsWith('http');
     
-    final double originalPrice = product.price * 1.2;
-    final String discountPercent = '20%';
-    final double averageRating = 4.5; // Giả lập rating
+    // Giả lập dữ liệu hiển thị (vì backend chưa trả về discount/rating cụ thể cho từng sp)
+    final double originalPrice = product.price * 1.1; // Giả sử giá gốc cao hơn 10%
+    final double averageRating = product.rating > 0 ? product.rating : 5.0; 
 
     return GestureDetector(
-      onTap: () => Get.to(() => ProductDetail(product: product)),
+      // Điều hướng sang trang chi tiết
+      onTap: () => Get.to(() => ProductDetail(product: product)), 
       child: Container(
         width: 180,
         padding: const EdgeInsets.all(1),
@@ -69,7 +69,7 @@ class ProductCardVertical extends StatelessWidget {
                       : const Icon(Icons.image, size: 40, color: Colors.grey), 
                   ),
 
-                  // Sale Tag
+                  // Sale Tag (Có thể ẩn nếu không có logic sale)
                   Positioned(
                     top: 0, 
                     left: 0, 
@@ -78,17 +78,16 @@ class ProductCardVertical extends StatelessWidget {
                       bgcolor: AppColors.secondary.withOpacity(0.8),
                       padding: const EdgeInsets.symmetric(horizontal: AppSizes.sm, vertical: AppSizes.xs),
                       child: Text(
-                        discountPercent,
+                        'Sale', // Hoặc logic tính %: '${((originalPrice - product.price)/originalPrice * 100).round()}%',
                         style: Theme.of(context).textTheme.labelLarge!.apply(color: Colors.black),
                       ),
                     ),
                   ),
 
-                  // ✅ NÚT FAVORITE ĐÃ SỬA
+                  // Nút Yêu thích
                   Positioned(
                     top: 0,
                     right: 0,
-                    // Dùng Obx để lắng nghe trạng thái thật từ Controller
                     child: Obx(() {
                       final isFavorite = wishlistController.isFavorite(product.id);
                       return CircularIcon(
@@ -113,13 +112,14 @@ class ProductCardVertical extends StatelessWidget {
                   ProductTitleText(title: product.name, smallSize: true),
                   const SizedBox(height: AppSizes.spaceBtwItems / 2),
                   
+                  // ✅ HIỂN THỊ TÊN SHOP CHÍNH XÁC
                   Row(
                     children: [
                       Text(
-                        'Shoex', 
+                        product.storeName.isNotEmpty ? product.storeName : "Shoex Store", 
                         overflow: TextOverflow.ellipsis, 
                         maxLines: 1, 
-                        style: Theme.of(context).textTheme.labelMedium
+                        style: Theme.of(context).textTheme.labelMedium!.apply(color: Colors.grey),
                       ),
                       const SizedBox(width: AppSizes.xs),
                       const Icon(Icons.verified, color: AppColors.primary, size: AppSizes.iconXs),
@@ -151,7 +151,7 @@ class ProductCardVertical extends StatelessWidget {
                         direction: Axis.horizontal,
                       ),
                       const SizedBox(width: 4),
-                      Text('($averageRating)', style: Theme.of(context).textTheme.labelSmall),
+                      Text('(${product.reviewCount})', style: Theme.of(context).textTheme.labelSmall),
                     ],
                   ),
                   
@@ -164,10 +164,12 @@ class ProductCardVertical extends StatelessWidget {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Giá gốc (Gạch ngang)
                           Text(
                             '\$${originalPrice.toStringAsFixed(0)}',
                             style: Theme.of(context).textTheme.labelMedium!.apply(decoration: TextDecoration.lineThrough, fontSizeFactor: 0.8),
                           ),
+                          // Giá bán thực tế
                           ProductPriceText(price: product.price.toStringAsFixed(0)),
                         ],
                       ),

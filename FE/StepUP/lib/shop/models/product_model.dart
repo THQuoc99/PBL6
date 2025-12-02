@@ -6,51 +6,51 @@ class ProductModel {
   final double price;
   final String? image;
   final String description;
-  // ✅ Đảm bảo biến này không bao giờ null
+  final String storeName;
+  final String storeId; // ✅ MỚI THÊM
+  final double rating;
+  final int reviewCount;
   final List<ProductVariantModel> variants;
 
   ProductModel({
-    required this.id, 
-    required this.name, 
-    required this.price, 
+    required this.id,
+    required this.name,
+    required this.price,
     this.image,
     required this.description,
-    this.variants = const [], 
+    this.storeName = '',
+    this.storeId = '', // ✅ Mặc định rỗng
+    this.rating = 0.0,
+    this.reviewCount = 0,
+    this.variants = const [],
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
-    // 1. Tạo list rỗng mặc định
     List<ProductVariantModel> variantsList = [];
-
-    // 2. Kiểm tra kỹ dữ liệu từ API
     if (json['variants'] != null && json['variants'] is List) {
-      try {
-        variantsList = (json['variants'] as List)
-            .map((item) => ProductVariantModel.fromJson(item))
-            .toList();
-      } catch (e) {
-        print("Lỗi parse variants: $e");
-      }
+      variantsList = (json['variants'] as List)
+          .map((item) => ProductVariantModel.fromJson(item))
+          .toList();
+    }
+
+    double parsedPrice = 0.0;
+    if (json['base_price'] != null) {
+      parsedPrice = double.tryParse(json['base_price'].toString()) ?? 0.0;
+    } else if (json['price'] != null) {
+      parsedPrice = double.tryParse(json['price'].toString()) ?? 0.0;
     }
 
     return ProductModel(
       id: json['product_id'] ?? json['id'] ?? 0,
       name: json['name'] ?? '',
-      price: double.tryParse(json['base_price'].toString()) ?? double.tryParse(json['price'].toString()) ?? 0.0,
+      price: parsedPrice,
       image: json['image'],
       description: json['description'] ?? '',
-      // ✅ Gán list đã xử lý (không bao giờ null)
-      variants: variantsList, 
+      storeName: json['store_name'] ?? '',
+      storeId: json['store_id'] ?? '', // ✅ Map với field từ backend
+      rating: double.tryParse(json['rating']?.toString() ?? '0') ?? 0.0,
+      reviewCount: json['review_count'] ?? 0,
+      variants: variantsList,
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'price': price,
-      'image': image,
-      'description': description,
-    };
   }
 }

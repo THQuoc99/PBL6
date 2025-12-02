@@ -1,31 +1,36 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .models import Cart, CartItem
-from products.models import ProductVariant
-from .serializers import CartSerializer
 
+# Import Models
+from .models import Cart, CartItem, Wishlist
+from products.models import Product, ProductVariant
+
+# Import Serializers
+from .serializers import CartSerializer
+from products.serializers import ProductSerializer
+
+# ==============================================================================
+# CART VIEWSET (Xử lý Giỏ hàng)
+# ==============================================================================
 class CartViewSet(viewsets.ViewSet):
-    # Cho phép cả User đăng nhập và Guest (nếu bạn muốn làm guest cart sau này)
-    # Hiện tại ưu tiên User đã đăng nhập
     permission_classes = [IsAuthenticated]
 
     def get_cart(self, request):
-        # Lấy hoặc tạo giỏ hàng cho user
+        """Helper: Lấy hoặc tạo giỏ hàng cho user"""
         cart, _ = Cart.objects.get_or_create(user=request.user)
         return cart
 
     def list(self, request):
-        """Xem giỏ hàng"""
+        """GET /api/cart/ - Xem giỏ hàng"""
         cart = self.get_cart(request)
         serializer = CartSerializer(cart)
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'])
     def add(self, request):
-        """Thêm sản phẩm (Variant) vào giỏ"""
-        # Flutter gửi lên: { "variant_id": 1, "quantity": 1 }
+        """POST /api/cart/add/ - Thêm sản phẩm vào giỏ"""
         variant_id = request.data.get('variant_id')
         quantity = int(request.data.get('quantity', 1))
 
@@ -62,8 +67,7 @@ class CartViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['patch'])
     def update_quantity(self, request, pk=None):
-        """Sửa số lượng (pk là item_id)"""
-        # Flutter gửi: PATCH /api/cart/{item_id}/update_quantity/ body: {"quantity": 5}
+        """PATCH /api/cart/{item_id}/update_quantity/ - Sửa số lượng"""
         try:
             quantity = int(request.data.get('quantity', 1))
             cart = self.get_cart(request)
@@ -88,7 +92,7 @@ class CartViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['delete'])
     def remove(self, request, pk=None):
-        """Xóa item"""
+        """DELETE /api/cart/{item_id}/remove/ - Xóa item"""
         try:
             cart = self.get_cart(request)
             item = CartItem.objects.get(pk=pk, cart=cart)
@@ -99,3 +103,69 @@ class CartViewSet(viewsets.ViewSet):
             return Response(serializer.data)
         except CartItem.DoesNotExist:
             return Response({'error': 'Item không tìm thấy'}, status=404)
+
+
+# ==============================================================================
+# WISHLIST APIs (Xử lý Yêu thích)
+# ==============================================================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_wishlist(request):
+    """
+    GET /api/cart/wishlist/
+    Lấy danh sách sản phẩm yêu thích (trả về danh sách Product unique).
+    """
+    wishlist_items = Wishlist.objects.filter(user=request.user).select_related('variant__product')
+    
+    product_list = []
+    seen_ids = set()
+    
+    for item in wishlist_items:
+        product = item.variant.product
+        # Lọc trùng lặp product_id
+        if product.product_id not in seen_ids:
+            product_list.append(product)
+            seen_ids.add(product.product_id)
+            
+    serializer = ProductSerializer(product_list, many=True, context={'request': request})
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_wishlist_api(request):
+    """
+    POST /api/cart/wishlist/toggle/
+    Thêm/Xóa yêu thích dựa trên product_id.
+    Backend tự tìm variant đại diện để lưu.
+    """
+    product_id = request.data.get('product_id')
+    user = request.user
+    
+    if not product_id:
+        return Response({'error': 'Thiếu product_id'}, status=400)
+
+    # 1. Tìm tất cả biến thể (variant) của sản phẩm này
+    variants = ProductVariant.objects.filter(product_id=product_id)
+    
+    if not variants.exists():
+        return Response({'error': 'Sản phẩm không tồn tại hoặc đã hết hàng'}, status=404)
+
+    # 2. Kiểm tra xem User đã lưu BẤT KỲ biến thể nào của sp này chưa
+    existing_item = Wishlist.objects.filter(user=user, variant__in=variants)
+
+    if existing_item.exists():
+        # --- TRƯỜNG HỢP XÓA (UNLIKE) ---
+        existing_item.delete()
+        return Response({'status': 'removed', 'message': 'Đã xóa khỏi danh sách yêu thích'})
+    else:
+        # --- TRƯỜNG HỢP THÊM (LIKE) ---
+        # Lấy biến thể đầu tiên để làm đại diện lưu vào DB
+        first_variant = variants.first()
+        
+        Wishlist.objects.create(
+            user=user,
+            variant=first_variant
+        )
+        return Response({'status': 'added', 'message': 'Đã thêm vào danh sách yêu thích'})

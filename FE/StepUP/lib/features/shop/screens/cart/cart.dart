@@ -8,6 +8,7 @@ import 'package:flutter_app/features/shop/screens/cart/widgets/cart_items.dart';
 
 class CartScreen extends StatelessWidget {
   final bool showBackArrow;
+  
 
   const CartScreen({
     super.key,

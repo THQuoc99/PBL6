@@ -1,31 +1,80 @@
 class ProvinceModel {
   final int id;
   final String name;
+
   ProvinceModel({required this.id, required this.name});
-  factory ProvinceModel.fromJson(Map<String, dynamic> json) => 
-      ProvinceModel(id: json['province_id'], name: json['name']);
+
+  factory ProvinceModel.fromJson(Map<String, dynamic> json) {
+    return ProvinceModel(
+      // API OpenVN trả về "code", không phải "id"
+      id: json['code'] ?? 0, 
+      name: json['name'] ?? '',
+    );
+  }
+
+  // Bắt buộc phải có để Dropdown hoạt động đúng
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProvinceModel && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+  
+  @override
+  String toString() => name;
 }
 
 class DistrictModel {
   final int id;
   final String name;
-  DistrictModel({required this.id, required this.name});
-  factory DistrictModel.fromJson(Map<String, dynamic> json) => 
-      DistrictModel(id: json['district_id'], name: json['name']);
+  final int provinceId;
+
+  DistrictModel({required this.id, required this.name, required this.provinceId});
+
+  factory DistrictModel.fromJson(Map<String, dynamic> json) {
+    return DistrictModel(
+      id: json['code'] ?? 0,
+      name: json['name'] ?? '',
+      provinceId: json['province_code'] ?? 0,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DistrictModel && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+  
+  @override
+  String toString() => name;
 }
 
 class WardModel {
   final int id;
   final String name;
-  WardModel({required this.id, required this.name});
-  factory WardModel.fromJson(Map<String, dynamic> json) => 
-      WardModel(id: json['ward_id'], name: json['name']);
-}
+  final int districtId;
 
-class HamletModel {
-  final int id;
-  final String name;
-  HamletModel({required this.id, required this.name});
-  factory HamletModel.fromJson(Map<String, dynamic> json) => 
-      HamletModel(id: json['hamlet_id'], name: json['name']);
+  WardModel({required this.id, required this.name, required this.districtId});
+
+  factory WardModel.fromJson(Map<String, dynamic> json) {
+    return WardModel(
+      id: json['code'] ?? 0,
+      name: json['name'] ?? '',
+      districtId: json['district_code'] ?? 0,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WardModel && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+  
+  @override
+  String toString() => name;
 }

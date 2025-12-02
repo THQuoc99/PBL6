@@ -8,101 +8,129 @@ import 'package:flutter_app/shop/controllers/address_controller.dart';
 import 'package:flutter_app/shop/models/address_model.dart';
 
 class AddAddressController extends GetxController {
-  final String baseUrl = "http://10.0.2.2:8000/api/address"; 
-  
+  final String locationApiUrl = "https://provinces.open-api.vn/api"; 
+  final String backendUrl = "http://10.0.2.2:8000/api/address";
+
   var provinces = <ProvinceModel>[].obs;
   var districts = <DistrictModel>[].obs;
   var wards = <WardModel>[].obs;
-  var hamlets = <HamletModel>[].obs;
 
-  var selectedProvince = Rxn<int>();
-  var selectedDistrict = Rxn<int>();
-  var selectedWard = Rxn<int>();
-  var selectedHamlet = Rxn<int>();
+  var selectedProvince = Rxn<ProvinceModel>();
+  var selectedDistrict = Rxn<DistrictModel>();
+  var selectedWard = Rxn<WardModel>();
 
-  // ✅ THÊM 2 CONTROLLER NÀY
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
   final detailController = TextEditingController();
   
   final isLoading = false.obs;
-  
   var isEditMode = false.obs;
   int? addressIdToEdit;
 
   @override
   void onInit() {
-    fetchProvinces();
     super.onInit();
+    // Tải danh sách tỉnh ngay khi mở màn hình
+    fetchProvinces();
   }
 
+  // --- LOGIC KHÔI PHỤC DỮ LIỆU KHI SỬA (QUAN TRỌNG) ---
   Future<void> initUpdateData(AddressModel address) async {
     isEditMode.value = true;
     addressIdToEdit = address.id;
     
-    // ✅ ĐIỀN DỮ LIỆU CŨ VÀO FORM
+    // 1. Điền text cơ bản
     nameController.text = address.name;
     phoneController.text = address.phoneNumber;
-    detailController.text = address.street;
+    detailController.text = address.detail;
 
-    isLoading.value = true;
-    try {
-      if (provinces.isEmpty) await fetchProvinces();
-      var p = provinces.firstWhereOrNull((element) => element.name == address.city);
-      if (p != null) {
-        selectedProvince.value = p.id;
-        await fetchWards(p.id);
-        var w = wards.firstWhereOrNull((element) => element.name == address.ward);
-        if (w != null) {
-          selectedWard.value = w.id;
-          await fetchHamlets(w.id);
+    // 2. Khôi phục Dropdown (Phức tạp vì phải đợi API load xong mới chọn được)
+    // Đảm bảo danh sách tỉnh đã có
+    if (provinces.isEmpty) {
+      await fetchProvinces();
+    }
+
+    // A. Tìm và chọn Tỉnh
+    // So sánh tên từ DB (address.province) với tên trong list API
+    // Lưu ý: Cần chuẩn hóa chuỗi nếu cần (trim, toLowerCase) để so sánh chính xác
+    var foundProvince = provinces.firstWhereOrNull(
+      (p) => p.name.toLowerCase().contains(address.province.toLowerCase()) 
+          || address.province.toLowerCase().contains(p.name.toLowerCase())
+    );
+
+    if (foundProvince != null) {
+      selectedProvince.value = foundProvince;
+      
+      // B. Tải danh sách Huyện của Tỉnh đó
+      await fetchDistricts(foundProvince.id);
+
+      // C. Tìm và chọn Huyện (address.hamlet chứa tên huyện trong DB của bạn)
+      var foundDistrict = districts.firstWhereOrNull(
+        (d) => d.name.toLowerCase().contains(address.hamlet.toLowerCase())
+            || address.hamlet.toLowerCase().contains(d.name.toLowerCase())
+      );
+
+      if (foundDistrict != null) {
+        selectedDistrict.value = foundDistrict;
+
+        // D. Tải danh sách Xã của Huyện đó
+        await fetchWards(foundDistrict.id);
+
+        // E. Tìm và chọn Xã
+        var foundWard = wards.firstWhereOrNull(
+          (w) => w.name.toLowerCase().contains(address.ward.toLowerCase())
+              || address.ward.toLowerCase().contains(w.name.toLowerCase())
+        );
+
+        if (foundWard != null) {
+          selectedWard.value = foundWard;
         }
       }
-    } catch (e) {
-      print("Lỗi điền dữ liệu cũ: $e");
-    } finally {
-      isLoading.value = false;
     }
   }
 
   Future<void> fetchProvinces() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/provinces/'));
+      final response = await http.get(Uri.parse('$locationApiUrl/p/'));
       if (response.statusCode == 200) {
         final List data = json.decode(utf8.decode(response.bodyBytes));
         provinces.value = data.map((e) => ProvinceModel.fromJson(e)).toList();
       }
-    } catch (e) { print('Lỗi tỉnh: $e'); }
+    } catch (e) {
+      print('❌ Lỗi lấy Tỉnh: $e');
+    }
   }
   
-  Future<void> fetchWards(int provinceId) async {
-    wards.clear(); hamlets.clear(); selectedWard.value = null; selectedHamlet.value = null;
+  Future<void> fetchDistricts(int provinceId) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/wards/?province_id=$provinceId'));
+      final response = await http.get(Uri.parse('$locationApiUrl/p/$provinceId?depth=2'));
       if (response.statusCode == 200) {
-        final List data = json.decode(utf8.decode(response.bodyBytes));
-        wards.value = data.map((e) => WardModel.fromJson(e)).toList();
+        var data = json.decode(utf8.decode(response.bodyBytes));
+        var list = data['districts'] as List;
+        districts.value = list.map((e) => DistrictModel.fromJson(e)).toList();
       }
-    } catch (e) { print('Lỗi phường: $e'); }
+    } catch (e) {
+      print('❌ Lỗi Exception Huyện: $e');
+    }
   }
 
-  Future<void> fetchHamlets(int wardId) async {
-     hamlets.clear(); selectedHamlet.value = null;
+  Future<void> fetchWards(int districtId) async {
      try {
-      final response = await http.get(Uri.parse('$baseUrl/hamlets/?ward_id=$wardId'));
+      final response = await http.get(Uri.parse('$locationApiUrl/d/$districtId?depth=2'));
       if (response.statusCode == 200) {
-        final List data = json.decode(utf8.decode(response.bodyBytes));
-        hamlets.value = data.map((e) => HamletModel.fromJson(e)).toList();
+        var data = json.decode(utf8.decode(response.bodyBytes));
+        var list = data['wards'] as List;
+        wards.value = list.map((e) => WardModel.fromJson(e)).toList();
       }
-    } catch (e) { print('Lỗi thôn: $e'); }
+    } catch (e) {
+      print('❌ Lỗi Exception Xã: $e');
+    }
   }
 
   Future<void> saveAddress() async {
-    // ✅ VALIDATE THÊM NAME VÀ PHONE
     if (nameController.text.isEmpty || phoneController.text.isEmpty ||
         detailController.text.isEmpty || selectedProvince.value == null || selectedWard.value == null) {
-      Get.snackbar('Thông báo', 'Vui lòng điền đầy đủ thông tin', 
-         snackPosition: SnackPosition.BOTTOM, margin: const EdgeInsets.all(10));
+      Get.snackbar('Thiếu thông tin', 'Vui lòng điền đầy đủ các trường', backgroundColor: Colors.orange.withOpacity(0.2));
       return;
     }
 
@@ -112,46 +140,52 @@ class AddAddressController extends GetxController {
       final token = prefs.getString('token');
 
       final body = {
-        // ✅ GỬI THÊM NAME VÀ PHONE LÊN SERVER
         "name": nameController.text,
         "phone": phoneController.text,
         "detail": detailController.text,
-        "province": selectedProvince.value,
-        "ward": selectedWard.value,
-        "hamlet": selectedHamlet.value,
+        "province": selectedProvince.value!.name, 
+        "ward": selectedWard.value!.name,
+        "hamlet": selectedDistrict.value?.name ?? '', 
         "is_default": true
       };
 
       http.Response response;
-      
+      final headers = {
+        'Content-Type': 'application/json', 
+        'Authorization': 'Bearer $token'
+      };
+
       if (isEditMode.value && addressIdToEdit != null) {
         response = await http.put(
-          Uri.parse('$baseUrl/my-addresses/$addressIdToEdit/'),
-          headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
-          body: json.encode(body),
+          Uri.parse('$backendUrl/my-addresses/$addressIdToEdit/'),
+          headers: headers, body: json.encode(body),
         );
       } else {
         response = await http.post(
-          Uri.parse('$baseUrl/my-addresses/'),
-          headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
-          body: json.encode(body),
+          Uri.parse('$backendUrl/my-addresses/'),
+          headers: headers, body: json.encode(body),
         );
       }
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        if (Get.context != null) {
-          Navigator.of(Get.context!).pop();
+        // 1. Refresh list bên ngoài
+        if (Get.isRegistered<AddressController>()) {
+          await Get.find<AddressController>().fetchUserAddresses();
         }
 
-        Get.snackbar('Thành công', isEditMode.value ? 'Đã cập nhật địa chỉ' : 'Đã thêm địa chỉ mới',
-            backgroundColor: Colors.green, colorText: Colors.white,
-            snackPosition: SnackPosition.BOTTOM, margin: const EdgeInsets.all(10));
-        
-        if (Get.isRegistered<AddressController>()) {
-          Get.find<AddressController>().fetchUserAddresses();
-        }
+        // 2. Đóng màn hình
+        Get.back();
+
+        // 3. Hiện thông báo
+        Get.snackbar(
+          'Thành công', 
+          'Đã lưu địa chỉ', 
+          backgroundColor: Colors.green.withOpacity(0.2),
+          colorText: Colors.green,
+          icon: const Icon(Icons.check_circle, color: Colors.green),
+        );
       } else {
-        Get.snackbar('Lỗi', 'Server: ${response.body}');
+        Get.snackbar('Lỗi', 'Server trả về: ${response.body}');
       }
     } catch (e) {
       Get.snackbar('Lỗi', 'Lỗi kết nối: $e');

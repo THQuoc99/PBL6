@@ -1,36 +1,53 @@
-from rest_framework import viewsets
+from rest_framework import viewsets, filters
 from rest_framework.permissions import AllowAny
 from .models import Product, Category
 from .serializers import ProductSerializer, CategorySerializer
 
-class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    API trả về danh sách danh mục.
-    """
-    # Chỉ lấy danh mục cha (parent=None) và đang hoạt động
-    queryset = Category.objects.filter(is_active=True, parent__isnull=True)
-    serializer_class = CategorySerializer
-    permission_classes = [AllowAny] 
-
 class ProductViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    API trả về danh sách sản phẩm.
+    API sản phẩm: Hỗ trợ tìm kiếm & Lọc theo danh mục (bao gồm cả danh mục con)
     """
-    # Chỉ lấy sản phẩm đang hoạt động
-    queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductSerializer
     permission_classes = [AllowAny]
+    filter_backends = [filters.SearchFilter] 
+    search_fields = ['name', 'description', 'brand__name', 'category__name', 'model_code']
     
-    # Nếu bạn muốn tìm kiếm theo tên (?search=Nike)
     def get_queryset(self):
-        queryset = super().get_queryset()
-        search_term = self.request.query_params.get('search', None)
+        # Chỉ lấy sản phẩm active
+        queryset = Product.objects.filter(is_active=True)
+        
+        # 1. Lọc theo Category (Bao gồm cả sub-categories)
         category_id = self.request.query_params.get('category', None)
         
-        if search_term:
-            queryset = queryset.filter(name__icontains=search_term)
-            
         if category_id:
-            queryset = queryset.filter(category__category_id=category_id)
+            try:
+                # Tìm danh mục cha
+                parent_category = Category.objects.get(pk=category_id)
+                
+                # Lấy tất cả danh mục con cháu của nó (nếu có)
+                categories_to_filter = [parent_category] + list(parent_category.subcategories.all())
+                
+                # Lọc sản phẩm thuộc bất kỳ danh mục nào trong list trên
+                queryset = queryset.filter(category__in=categories_to_filter)
+                
+            except Category.DoesNotExist:
+                return queryset.none()
+        
+        # 2. Lọc theo Store (nếu cần)
+        store_id = self.request.query_params.get('store_id', None)
+        if store_id:
+             queryset = queryset.filter(store__store_id=store_id)
             
         return queryset
+
+class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    API danh sách danh mục sản phẩm.
+    Mặc định chỉ trả về các danh mục CHA (parent=None).
+    """
+    serializer_class = CategorySerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        # Chỉ lấy danh mục gốc (Parent Categories)
+        return Category.objects.filter(is_active=True, parent__isnull=True)

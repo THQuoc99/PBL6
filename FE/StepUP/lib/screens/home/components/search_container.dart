@@ -23,20 +23,19 @@ class SearchContainer extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Container(
           width: double.infinity,
-          padding: EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), 
           decoration: BoxDecoration(
-            color: showBG ? Colors.white : Colors.transparent,//.withValues(alpha: 0.3),
+            color: showBG ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(30),
             border: showBorder ? Border.all(color: Colors.white, width: 2) : null,
           ),
           child: Row(
             children: [
               Icon(icon, color: Colors.grey), 
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Text(
                 hintText,
-                style: TextStyle(color: Colors.grey, fontSize: 18),
-                
+                style: const TextStyle(color: Colors.grey, fontSize: 18),
               ),
             ],
           ),

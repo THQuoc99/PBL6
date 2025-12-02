@@ -7,6 +7,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
         
+        # Trả về thêm avatar url trong token response nếu cần
+        avatar_url = None
+        if self.user.avatar:
+            try:
+                # Nếu dùng storage local, cần đảm bảo url đầy đủ
+                avatar_url = self.user.avatar.url
+            except:
+                pass
+
         return {
             'success': True,
             'token': data['access'],
@@ -16,13 +25,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'email': self.user.email,
             'user_id': self.user.id,       
             'phone': self.user.phone, 
+            'role': self.user.role,
+            'avatar': avatar_url,
+            
+            # --- QUAN TRỌNG: Trả về ngày sinh khi login ---
+            'birth_date': self.user.birth_date, 
+            # ----------------------------------------------
+            
             'message': 'Đăng nhập thành công!'
         }
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
-    """
-    Serializer Đăng ký (Register)
-    """
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True, required=True, label="Xác nhận mật khẩu")
 
@@ -30,48 +43,53 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         model = User
         fields = (
             'username', 'password', 'password2', 'email', 
-            'full_name', 'phone', 'role'
+            'full_name', 'phone', 'role', 'birth_date' 
         )
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password": "Mật khẩu xác nhận không khớp."})
         
-        # Gán vai trò mặc định là 'buyer' nếu không được cung cấp
         if 'role' not in attrs or not attrs['role']:
              attrs['role'] = 'buyer'
              
         return attrs
 
     def create(self, validated_data):
-        # Băm mật khẩu và tạo User
+        # Tách password ra để dùng set_password
+        password = validated_data.pop('password')
+        validated_data.pop('password2')
+        
+        # Tách birth_date ra xử lý riêng nếu cần
+        birth_date = validated_data.pop('birth_date', None)
+
         user = User.objects.create(
-            username=validated_data['username'],
-            email=validated_data['email'],
-            full_name=validated_data['full_name'],
-            phone=validated_data['phone'],
-            role=validated_data['role']
+            **validated_data
         )
         
-        user.set_password(validated_data['password'])
+        if birth_date:
+            user.birth_date = birth_date
+
+        user.set_password(password)
         user.save()
-        
         return user
     
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        # Chỉ cho phép cập nhật 3 trường này
-        fields = ['full_name', 'phone', 'email']
+        # Cho phép update thêm avatar và ngày sinh
+        fields = ['full_name', 'phone', 'email', 'avatar', 'birth_date']
         extra_kwargs = {
-            'email': {'required': False}, # Cho phép cập nhật riêng lẻ
+            'email': {'required': False},
             'full_name': {'required': False},
             'phone': {'required': False},
+            'avatar': {'required': False},
+            'birth_date': {'required': False},
         }
 
     def validate_email(self, value):
-        # Kiểm tra xem email mới có bị trùng với người dùng khác không
-        user = self.instance # Lấy user hiện tại
-        if User.objects.filter(email=value).exclude(pk=user.pk).exists():
+        user = self.instance 
+        # Chỉ kiểm tra trùng email khi update (user đã tồn tại)
+        if user and User.objects.filter(email=value).exclude(pk=user.pk).exists():
             raise serializers.ValidationError("Email này đã được sử dụng bởi tài khoản khác.")
         return value

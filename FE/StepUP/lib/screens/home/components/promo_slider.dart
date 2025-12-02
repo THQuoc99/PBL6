@@ -21,10 +21,20 @@ class PromoSlider extends StatelessWidget {
       children: [
         CarouselSlider(
           options: CarouselOptions(
-            viewportFraction: 1,
-            onPageChanged: (index, _) => controller.updatePageIndicator(index)
+            viewportFraction: 1, // Hiển thị 1 ảnh full màn hình
+            aspectRatio: 2.0, // Tỷ lệ khung hình 
+            onPageChanged: (index, _) => controller.updatePageIndicator(index),
+            autoPlay: true,
+            autoPlayInterval: const Duration(seconds: 3),
+            autoPlayAnimationDuration: const Duration(milliseconds: 800),
+            autoPlayCurve: Curves.fastOutSlowIn,
           ),
-          items: banners.map((url) => RoundedImage(imageUrl: url)).toList(),
+          items: banners.map((url) => RoundedImage(
+            imageUrl: url,
+            fit: BoxFit.cover,       // QUAN TRỌNG: Lấp đầy khoảng trống
+            width: double.infinity,  // QUAN TRỌNG: Kéo dãn hết chiều ngang
+            applyImageRadius: true,  // Bo góc (nếu cần)
+          )).toList(),
         ),
         const SizedBox(height: AppSizes.xs),
         Center(
@@ -32,14 +42,13 @@ class PromoSlider extends StatelessWidget {
             () => Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                for(int i = 0;i<banners.length;i++)
-                CircularContainer(
-                  height: 4,
-                  width: 20,
-                  color: controller.carousalCurrentIndex.value == i ? Colors.blueAccent : Colors.grey,
-                  margin: const EdgeInsets.only(right: 10)
-                )
-                
+                for(int i = 0; i < banners.length; i++)
+                  CircularContainer(
+                    height: 4,
+                    width: 20,
+                    color: controller.carousalCurrentIndex.value == i ? Colors.blueAccent : Colors.grey,
+                    margin: const EdgeInsets.only(right: 10)
+                  )
               ],
             ),
           ),

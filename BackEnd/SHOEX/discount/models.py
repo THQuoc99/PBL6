@@ -1,15 +1,14 @@
 from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator
 from decimal import Decimal
-
 
 class Voucher(models.Model):
     """
-    Quản lý thông tin voucher chung
+    Quản lý thông tin voucher
     """
     TYPE_CHOICES = [
         ('platform', 'Platform'),
-        ('seller', 'Seller'),
+        ('store', 'Store'), # Đổi từ 'seller' sang 'store' cho đúng ngữ cảnh mới
     ]
     
     DISCOUNT_TYPE_CHOICES = [
@@ -19,50 +18,49 @@ class Voucher(models.Model):
 
     voucher_id = models.AutoField(
         primary_key=True,
-        verbose_name="Mã voucher",
-        help_text="ID tự tăng, duy nhất cho mỗi voucher"
+        verbose_name="Mã voucher"
     )
     code = models.CharField(
         max_length=50,
         unique=True,
-        verbose_name="Mã voucher",
-        help_text="Mã voucher duy nhất để người dùng nhập"
+        verbose_name="Mã voucher"
     )
     type = models.CharField(
         max_length=10,
         choices=TYPE_CHOICES,
-        verbose_name="Loại voucher",
-        help_text="Platform voucher hoặc seller voucher"
+        verbose_name="Loại voucher"
     )
+    
+    # --- THAY ĐỔI QUAN TRỌNG: Link tới Store thay vì User ---
+    # Cột trong DB tên là seller_id (varchar 50), trỏ tới store_store
     seller = models.ForeignKey(
-        'users.User',
+        'store.Store', 
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name='vouchers',
-        verbose_name="Người bán",
-        help_text="Người bán sở hữu voucher (NULL nếu là platform voucher)"
+        verbose_name="Cửa hàng sở hữu",
+        db_column='seller_id' # Map đúng với tên cột trong SQL
     )
+    # -------------------------------------------------------
+
     discount_type = models.CharField(
         max_length=10,
         choices=DISCOUNT_TYPE_CHOICES,
-        verbose_name="Loại giảm giá",
-        help_text="Giảm theo phần trăm hoặc số tiền cố định"
+        verbose_name="Loại giảm giá"
     )
     discount_value = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         validators=[MinValueValidator(Decimal('0.01'))],
-        verbose_name="Giá trị giảm",
-        help_text="Giá trị giảm giá (% hoặc số tiền)"
+        verbose_name="Giá trị giảm"
     )
     min_order_amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         default=Decimal('0.00'),
         validators=[MinValueValidator(Decimal('0.00'))],
-        verbose_name="Đơn tối thiểu",
-        help_text="Số tiền đơn hàng tối thiểu để áp dụng voucher"
+        verbose_name="Đơn tối thiểu"
     )
     max_discount = models.DecimalField(
         max_digits=10,
@@ -70,50 +68,25 @@ class Voucher(models.Model):
         null=True,
         blank=True,
         validators=[MinValueValidator(Decimal('0.01'))],
-        verbose_name="Giảm tối đa",
-        help_text="Số tiền giảm tối đa (dành cho voucher %)"
+        verbose_name="Giảm tối đa"
     )
-    start_date = models.DateField(
-        verbose_name="Ngày bắt đầu",
-        help_text="Ngày bắt đầu có hiệu lực"
-    )
-    end_date = models.DateField(
-        verbose_name="Ngày hết hạn",
-        help_text="Ngày hết hạn voucher"
-    )
+    start_date = models.DateField(verbose_name="Ngày bắt đầu")
+    end_date = models.DateField(verbose_name="Ngày hết hạn")
     usage_limit = models.IntegerField(
         null=True,
         blank=True,
         validators=[MinValueValidator(1)],
-        verbose_name="Giới hạn sử dụng",
-        help_text="Số lượt sử dụng tối đa toàn hệ thống (NULL = không giới hạn)"
+        verbose_name="Giới hạn sử dụng toàn hệ thống"
     )
     per_user_limit = models.IntegerField(
         default=1,
         validators=[MinValueValidator(1)],
-        verbose_name="Giới hạn mỗi user",
-        help_text="Số lượt sử dụng tối đa mỗi user"
+        verbose_name="Giới hạn mỗi user"
     )
-    is_active = models.BooleanField(
-        default=True,
-        verbose_name="Trạng thái",
-        help_text="Voucher có đang hoạt động không"
-    )
-    is_auto = models.BooleanField(
-        default=False,
-        verbose_name="Tự động áp dụng",
-        help_text="True = tự động áp dụng, False = phải nhập mã"
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="Ngày tạo",
-        help_text="Ngày giờ voucher được tạo"
-    )
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name="Ngày cập nhật",
-        help_text="Ngày giờ voucher được cập nhật lần cuối"
-    )
+    is_active = models.BooleanField(default=True, verbose_name="Kích hoạt")
+    is_auto = models.BooleanField(default=False, verbose_name="Tự động áp dụng")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Voucher"
@@ -125,191 +98,121 @@ class Voucher(models.Model):
 
     def clean(self):
         from django.core.exceptions import ValidationError
-        
-        # Validation: Seller voucher phải có seller_id
-        if self.type == 'seller' and not self.seller:
-            raise ValidationError("Seller voucher phải có thông tin seller")
-        
-        # Validation: Platform voucher không được có seller_id
+        if self.type == 'store' and not self.seller:
+            raise ValidationError("Store voucher phải thuộc về một cửa hàng cụ thể.")
         if self.type == 'platform' and self.seller:
-            raise ValidationError("Platform voucher không được có thông tin seller")
-        
-        # Validation: Ngày kết thúc phải sau ngày bắt đầu
+            raise ValidationError("Platform voucher không được gán cho cửa hàng.")
         if self.end_date <= self.start_date:
-            raise ValidationError("Ngày kết thúc phải sau ngày bắt đầu")
-        
-        # Validation: max_discount chỉ áp dụng cho discount_type = percent
-        if self.discount_type == 'fixed' and self.max_discount:
-            raise ValidationError("Max discount chỉ áp dụng cho voucher giảm theo %")
+            raise ValidationError("Ngày kết thúc phải sau ngày bắt đầu.")
 
 
 class VoucherProduct(models.Model):
-    """
-    Liên kết voucher với sản phẩm cụ thể
-    """
+    """Liên kết voucher với sản phẩm"""
     voucher = models.ForeignKey(
         Voucher,
         on_delete=models.CASCADE,
-        related_name='voucher_products',
-        verbose_name="Voucher"
+        related_name='voucher_products'
     )
     product = models.ForeignKey(
         'products.Product',
         on_delete=models.CASCADE,
-        related_name='voucher_products',
-        verbose_name="Sản phẩm"
+        related_name='voucher_products'
     )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="Ngày tạo"
-    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ['voucher', 'product']
-        verbose_name = "Voucher - Sản phẩm"
-        verbose_name_plural = "Voucher - Sản phẩm"
-
-    def __str__(self):
-        return f"{self.voucher.code} - {self.product.name}"
 
 
 class VoucherCategory(models.Model):
-    """
-    Liên kết voucher với danh mục sản phẩm
-    """
+    """Liên kết voucher với danh mục"""
     voucher = models.ForeignKey(
         Voucher,
         on_delete=models.CASCADE,
-        related_name='voucher_categories',
-        verbose_name="Voucher"
+        related_name='voucher_categories'
     )
     category = models.ForeignKey(
         'products.Category',
         on_delete=models.CASCADE,
-        related_name='voucher_categories',
-        verbose_name="Danh mục"
+        related_name='voucher_categories'
     )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="Ngày tạo"
-    )
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ['voucher', 'category']
-        verbose_name = "Voucher - Danh mục"
-        verbose_name_plural = "Voucher - Danh mục"
 
-    def __str__(self):
-        return f"{self.voucher.code} - {self.category.name}"
+
+# --- MODEL MỚI: Khớp với bảng discount_voucherstore trong DB ---
+class VoucherStore(models.Model):
+    """
+    Liên kết voucher (Platform) áp dụng cho các Store cụ thể
+    """
+    voucher = models.ForeignKey(
+        Voucher,
+        on_delete=models.CASCADE,
+        related_name='voucher_stores'
+    )
+    store = models.ForeignKey(
+        'store.Store',
+        on_delete=models.CASCADE,
+        related_name='applied_platform_vouchers'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['voucher', 'store']
+        verbose_name = "Voucher - Cửa hàng áp dụng"
 
 
 class VoucherSeller(models.Model):
     """
-    Liên kết voucher với nhiều seller (tùy chọn)
-    Dùng khi voucher platform áp dụng cho một số seller cụ thể
+    Giữ lại model này vì bảng discount_voucherseller VẪN TỒN TẠI trong datanew.sql
+    Tuy nhiên, logic nghiệp vụ nên ưu tiên dùng VoucherStore.
+    Bảng này liên kết Voucher với User (Seller cũ).
     """
-    voucher = models.ForeignKey(
-        Voucher,
-        on_delete=models.CASCADE,
-        related_name='voucher_sellers',
-        verbose_name="Voucher"
-    )
-    seller = models.ForeignKey(
-        'users.User',
-        on_delete=models.CASCADE,
-        related_name='voucher_sellers',
-        verbose_name="Người bán"
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="Ngày tạo"
-    )
+    voucher = models.ForeignKey(Voucher, on_delete=models.CASCADE)
+    seller = models.ForeignKey('users.User', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ['voucher', 'seller']
-        verbose_name = "Voucher - Seller"
-        verbose_name_plural = "Voucher - Seller"
-
-    def __str__(self):
-        return f"{self.voucher.code} - {self.seller.username}"
 
 
 class UserVoucher(models.Model):
-    """
-    Quản lý user đã lưu voucher nào và số lần sử dụng
-    """
+    """Quản lý ví voucher của người dùng"""
     user = models.ForeignKey(
         'users.User',
         on_delete=models.CASCADE,
-        related_name='user_vouchers',
-        verbose_name="Người dùng"
+        related_name='user_vouchers'
     )
     voucher = models.ForeignKey(
         Voucher,
         on_delete=models.CASCADE,
-        related_name='user_vouchers',
-        verbose_name="Voucher"
+        related_name='user_vouchers'
     )
-    saved_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="Thời điểm lưu",
-        help_text="Thời điểm user lưu voucher"
-    )
-    used_count = models.IntegerField(
-        default=0,
-        validators=[MinValueValidator(0)],
-        verbose_name="Số lần đã sử dụng",
-        help_text="Số lần user đã sử dụng voucher này"
-    )
+    saved_at = models.DateTimeField(auto_now_add=True)
+    used_count = models.IntegerField(default=0)
 
     class Meta:
         unique_together = ['user', 'voucher']
-        verbose_name = "User - Voucher"
-        verbose_name_plural = "User - Voucher"
         ordering = ['-saved_at']
-
-    def __str__(self):
-        return f"{self.user.username} - {self.voucher.code}"
 
     @property
     def can_use(self):
-        """Kiểm tra user có thể sử dụng voucher này không"""
         return self.used_count < self.voucher.per_user_limit
 
 
 class OrderVoucher(models.Model):
-    """
-    Lưu voucher được áp dụng cho đơn hàng
-    """
+    """Lịch sử áp dụng voucher vào đơn hàng"""
     order = models.ForeignKey(
         'orders.Order',
         on_delete=models.CASCADE,
-        related_name='order_vouchers',
-        verbose_name="Đơn hàng"
+        related_name='order_vouchers'
     )
     voucher = models.ForeignKey(
         Voucher,
         on_delete=models.CASCADE,
-        related_name='order_vouchers',
-        verbose_name="Voucher"
+        related_name='order_vouchers'
     )
-    discount_amount = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.01'))],
-        verbose_name="Số tiền được giảm",
-        help_text="Số tiền thực tế được giảm trong đơn hàng này"
-    )
-    applied_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="Thời điểm áp dụng",
-        help_text="Thời điểm voucher được áp dụng vào đơn hàng"
-    )
-
-    class Meta:
-        verbose_name = "Order - Voucher"
-        verbose_name_plural = "Order - Voucher"
-        ordering = ['-applied_at']
-
-    def __str__(self):
-        return f"Order {self.order.order_id} - {self.voucher.code} (-{self.discount_amount})"
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    applied_at = models.DateTimeField(auto_now_add=True)

@@ -1,198 +1,104 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:chat_bubbles/chat_bubbles.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart'; // ✅ Đổi từ get_storage sang shared_preferences
+import 'package:get/get.dart';
+import 'package:flutter_app/common/widgets/chat/message_bubble.dart'; // Import widget đã tạo
+import 'package:flutter_app/shop/controllers/chat_controller.dart'; // Import controller vừa tạo
+import 'package:flutter_app/constants/colors.dart';
 
-class MyChatScreen extends StatefulWidget {
+class MyChatScreen extends StatelessWidget {
   const MyChatScreen({super.key});
 
   @override
-  State<MyChatScreen> createState() => _MyChatScreenState();
-}
-
-class _MyChatScreenState extends State<MyChatScreen> {
-  final TextEditingController _textController = TextEditingController();
-  final ScrollController _scrollController = ScrollController();
-  
-  final ValueNotifier<bool> _isTypingNotifier = ValueNotifier(false);
-
-  bool _isLoading = false;
-
-  final List<Map<String, dynamic>> _messages = [
-    {'text': 'Xin chào! Tôi là trợ lý ảo Shoex. Bạn cần tìm giày gì không?', 'isSender': false},
-  ];
-
-  @override
-  void dispose() {
-    _textController.dispose();
-    _scrollController.dispose();
-    _isTypingNotifier.dispose();
-    super.dispose();
-  }
-
-  Future<void> _sendMessage() async {
-    final text = _textController.text.trim();
-    if (text.isEmpty) return;
-
-    setState(() {
-      _messages.add({'text': text, 'isSender': true});
-      _isLoading = true;
-    });
-    
-    _textController.clear();
-    _isTypingNotifier.value = false;
-    
-    _scrollToBottom();
-
-    try {
-      // ✅ SỬA LỖI TOKEN: Dùng SharedPreferences thay vì GetStorage
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token'); 
-
-      print("DEBUG CHAT: Token từ SharedPreferences: $token");
-
-      Map<String, String> headers = {
-        "Content-Type": "application/json",
-      };
-      if (token != null && token.isNotEmpty) {
-        headers["Authorization"] = "Bearer $token";
-      }
-
-      final url = Uri.parse('http://10.0.2.2:8000/chatbot/chat/'); 
-      
-      final response = await http.post(
-        url,
-        headers: headers,
-        body: jsonEncode({"message": text}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes)); 
-        final botReply = data['response'];
-
-        setState(() {
-          _messages.add({'text': botReply, 'isSender': false});
-        });
-      } else {
-        setState(() {
-          _messages.add({'text': "Lỗi server: ${response.statusCode}", 'isSender': false});
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _messages.add({'text': "Lỗi kết nối: $e", 'isSender': false});
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        _scrollToBottom();
-      }
-    }
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final controller = Get.put(ChatController());
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('AI Chatbot Shoex'),
         centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        titleTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
+        iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: Column(
         children: [
+          // --- DANH SÁCH TIN NHẮN ---
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.only(bottom: 10),
-              itemCount: _messages.length,
+            child: Obx(() => ListView.builder(
+              controller: controller.scrollController,
+              padding: const EdgeInsets.all(16),
+              itemCount: controller.messages.length,
               itemBuilder: (context, index) {
-                final message = _messages[index];
-                return BubbleSpecialThree(
-                  text: message['text'],
-                  isSender: message['isSender'],
-                  color: message['isSender']
-                      ? const Color(0xFF1B97F3)
-                      : const Color(0xFFE8E8EE),
-                  tail: true,
-                  textStyle: TextStyle(
-                    color: message['isSender'] ? Colors.white : Colors.black,
-                    fontSize: 16,
-                  ),
+                final msg = controller.messages[index];
+                // Sử dụng MessageBubble custom để hỗ trợ Markdown và Link
+                return MessageBubble(
+                  message: msg.text,
+                  isUser: msg.isUser,
                 );
               },
-            ),
+            )),
           ),
 
-          if (_isLoading)
-             const Padding(
-               padding: EdgeInsets.all(8.0),
-               child: Align(
-                 alignment: Alignment.centerLeft,
-                 child: Text("  Shoex đang soạn tin...", style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
-               ),
-             ),
+          // --- INDICATOR KHI ĐANG TẢI ---
+          Obx(() {
+            if (controller.isLoading.value) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text("Shoex đang soạn tin...", style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
 
+          // --- Ô NHẬP LIỆU ---
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, -5),
+                ),
+              ],
+            ),
             child: Row(
               children: [
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(30),
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(24),
                     ),
                     child: TextField(
-                      controller: _textController,
+                      controller: controller.textController,
                       textCapitalization: TextCapitalization.sentences,
-                      onChanged: (value) {
-                        _isTypingNotifier.value = value.trim().isNotEmpty;
-                      },
                       decoration: const InputDecoration(
-                        hintText: 'Nhập tin nhắn...',
+                        hintText: 'Hỏi gì đó về giày...',
                         border: InputBorder.none,
                       ),
-                      onSubmitted: (_) => _sendMessage(),
+                      onSubmitted: (_) => controller.sendMessage(),
                     ),
                   ),
                 ),
+                const SizedBox(width: 12),
                 
-                const SizedBox(width: 8),
-                
-                ValueListenableBuilder<bool>(
-                  valueListenable: _isTypingNotifier,
-                  builder: (context, isTyping, child) {
-                    return CircleAvatar(
-                      backgroundColor: (isTyping && !_isLoading) 
-                          ? const Color(0xFF1B97F3) 
-                          : Colors.grey,
-                      child: IconButton(
-                        icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                        onPressed: (isTyping && !_isLoading) ? _sendMessage : null,
-                      ),
-                    );
-                  },
-                ),
+                // Nút gửi
+                Obx(() => CircleAvatar(
+                  backgroundColor: controller.isLoading.value ? Colors.grey : AppColors.primary,
+                  child: IconButton(
+                    icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                    onPressed: controller.isLoading.value ? null : controller.sendMessage,
+                  ),
+                )),
               ],
             ),
           ),
-          const SizedBox(height: 10),
         ],
       ),
     );

@@ -152,7 +152,7 @@ class CartItemAdmin(admin.ModelAdmin):
         'created_at',
         'updated_at',
         'variant__product__category',
-        'variant__product__seller'
+        'variant__product__store'
     )
     search_fields = (
         'cart__user__username',
@@ -290,7 +290,7 @@ class WishlistAdmin(admin.ModelAdmin):
     list_filter = (
         'created_at',
         'variant__product__category',
-        'variant__product__seller'
+        'variant__product__store'
     )
     search_fields = (
         'user__username',
@@ -331,15 +331,21 @@ class WishlistAdmin(admin.ModelAdmin):
     product_display.short_description = "Sản phẩm"
     
     def variant_info(self, obj):
-        """Hiển thị thông tin variant"""
-        variant_url = reverse('admin:products_productvariant_change', args=[obj.variant.pk])
-        return format_html(
-            '<a href="{}">{}</a><br><small>{}</small>',
-            variant_url,
-            obj.variant.sku,
-            obj.variant.option_combinations
-        )
-    variant_info.short_description = "Biến thể"
+        if not obj.variant:
+            return "-"
+        try:
+            url = reverse('admin:products_product_change', args=[obj.variant.product.pk])
+            return format_html(
+                '<a href="{}"><b>{}</b></a><br><small>Biến thể: {}</small>',
+                url,
+                obj.variant.product.name,
+                obj.variant.sku
+            )
+        except Exception:
+            return f"{obj.variant.product.name} ({obj.variant.sku})"
+
+    variant_info.short_description = 'Thông tin sản phẩm'
+
     
     def price_display(self, obj):
         """Hiển thị giá hiện tại"""

@@ -20,14 +20,26 @@ class CartItems extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.find<CartController>();
 
-    return Obx(
-      () => ListView.separated(
+    return Obx(() {
+      // Lọc danh sách item cần hiển thị
+      // Nếu ở trang Checkout (showAddRemoveButtons = false) -> Chỉ lấy item được chọn
+      // Nếu ở trang Cart (showAddRemoveButtons = true) -> Lấy tất cả
+      final itemsToShow = showAddRemoveButtons 
+          ? controller.cartItems 
+          : controller.selectedItems;
+
+      return ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         separatorBuilder: (_, __) => const SizedBox(height: AppSizes.spaceBtwSections),
-        itemCount: controller.cartItems.length,
+        itemCount: itemsToShow.length,
         itemBuilder: (_, index) {
-          final item = controller.cartItems[index];
+          final item = itemsToShow[index];
+
+          // Nếu ở Checkout thì không cho vuốt xóa (Slidable)
+          if (!showAddRemoveButtons) {
+            return _buildItemContent(item, controller, context);
+          }
 
           return Slidable(
             key: ValueKey(item.itemId),
@@ -45,56 +57,68 @@ class CartItems extends StatelessWidget {
                 ),
               ],
             ),
-            child: Row(
-              children: [
-                // ✅ THÊM CHECKBOX (Chỉ hiện ở màn hình Cart, ẩn ở Checkout)
-                if (showAddRemoveButtons) 
-                  Obx(() => Checkbox(
-                    value: item.isSelected.value,
-                    activeColor: AppColors.primary,
-                    onChanged: (value) {
-                      // Gọi hàm toggleSelection trong controller
-                      controller.toggleSelection(index);
-                    },
-                  )),
-
-                // Phần nội dung chính (Expanded để chiếm hết phần còn lại)
-                Expanded(
-                  child: Column(
-                    children: [
-                      CartItem(cartItem: item), 
-
-                      if (showAddRemoveButtons) 
-                        const SizedBox(height: AppSizes.spaceBtwItems),
-
-                      if (showAddRemoveButtons)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                const SizedBox(width: 70),
-                                ProductQuantityAddMinus(
-                                  quantity: item.quantity,
-                                  add: () => controller.updateQuantity(item.itemId, item.quantity + 1),
-                                  remove: () => controller.updateQuantity(item.itemId, item.quantity - 1),
-                                ),
-                              ],
-                            ),
-                            // ✅ Hiển thị giá tổng của item (Giá x Số lượng)
-                            ProductPriceText(
-                              price: (item.price * item.quantity).toStringAsFixed(0)
-                            ),
-                          ],
-                        )
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            child: _buildItemContent(item, controller, context),
           );
         },
-      ),
+      );
+    });
+  }
+
+  // Tách widget con để tái sử dụng
+  Widget _buildItemContent(var item, var controller, BuildContext context) {
+    return Row(
+      children: [
+        // CHECKBOX (Chỉ hiện ở màn hình Cart)
+        if (showAddRemoveButtons) 
+          Obx(() => Checkbox(
+            value: item.isSelected.value,
+            activeColor: AppColors.primary,
+            // Tìm index thực trong list gốc để toggle chính xác
+            onChanged: (value) {
+               final realIndex = controller.cartItems.indexOf(item);
+               if (realIndex != -1) controller.toggleSelection(realIndex);
+            },
+          )),
+
+        Expanded(
+          child: Column(
+            children: [
+              CartItem(cartItem: item), 
+
+              if (showAddRemoveButtons) 
+                const SizedBox(height: AppSizes.spaceBtwItems),
+
+              if (showAddRemoveButtons)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const SizedBox(width: 70),
+                        ProductQuantityAddMinus(
+                          quantity: item.quantity,
+                          add: () => controller.updateQuantity(item.itemId, item.quantity + 1),
+                          remove: (){
+                            if (item.quantity > 1) { 
+                              controller.updateQuantity(item.itemId, item.quantity - 1);
+                            }
+                          }
+                        ),
+                      ],
+                    ),
+                    // Hiển thị giá
+                    ProductPriceText(
+                      price: (item.subTotal > 0 
+                          ? item.subTotal 
+                          : item.price * item.quantity
+                      ).toStringAsFixed(0)
+                    ),
+                  ],
+                )
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

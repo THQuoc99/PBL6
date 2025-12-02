@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:flutter/material.dart'; // Cần import để dùng Colors
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_app/shop/models/product_model.dart';
 import 'package:flutter_app/shop/controllers/user_controller.dart';
@@ -7,78 +9,132 @@ import 'package:flutter_app/shop/controllers/user_controller.dart';
 class WishlistController extends GetxController {
   static WishlistController get instance => Get.find();
 
-  // Danh sách yêu thích (Reactive)
   final RxList<ProductModel> favorites = <ProductModel>[].obs;
+  final isLoading = false.obs;
   
   // Lấy UserController để biết ai đang đăng nhập
   final userController = Get.find<UserController>();
+
+  // ✅ BASE URL (Thay bằng IP/Domain thật của bạn)
+  final String baseUrl = "http://10.0.2.2:8000/api/cart/wishlist"; 
 
   @override
   void onInit() {
     super.onInit();
     // 1. Tải danh sách lần đầu
-    loadFavorites();
+    fetchWishlist();
     
-    // 2. ✅ TỰ ĐỘNG: Lắng nghe sự thay đổi của UserID
-    // Khi User đăng nhập hoặc đăng xuất -> UserID đổi -> Tự động tải lại wishlist của người đó
-    // (Đảm bảo UserController có biến userID là RxString hoặc RxInt)
+    // 2. TỰ ĐỘNG: Lắng nghe sự thay đổi của UserID
     ever(userController.userID, (_) {
-      print("🔄 User changed to ${userController.userID.value}, reloading wishlist...");
-      loadFavorites();
+      fetchWishlist();
     });
   }
 
-  // ✅ Tạo Key lưu trữ động theo User ID
-  // Ví dụ: 'wishlist_1', 'wishlist_2', 'wishlist_guest'
-  String get _storageKey {
-    final uid = userController.userID.value.toString();
-    if (uid.isEmpty || uid == '0') {
-      return 'wishlist_guest'; // Key cho khách chưa đăng nhập
+  // --- 1. TẢI DANH SÁCH TỪ API ---
+  Future<void> fetchWishlist() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token == null) {
+      favorites.clear();
+      return;
     }
-    return 'wishlist_$uid'; // Key riêng cho từng user
+
+    try {
+      isLoading.value = true;
+      final response = await http.get(
+        Uri.parse('$baseUrl/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
+        favorites.assignAll(
+          data.map((e) => ProductModel.fromJson(e)).toList(),
+        );
+      } else {
+        print("Lỗi tải wishlist: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Exception wishlist: $e");
+    } finally {
+      isLoading.value = false;
+    }
   }
 
-  // Thêm/Xóa sản phẩm
-  void toggleFavorite(ProductModel product) {
-    if (isFavorite(product.id)) {
+  // --- 2. KIỂM TRA TRẠNG THÁI ---
+  bool isFavorite(int productId) {
+    return favorites.any((product) => product.id == productId);
+  }
+
+  // --- 3. THÊM / XÓA (GỌI API) ---
+  Future<void> toggleFavorite(ProductModel product) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+
+    if (token == null) {
+      _safeSnackbar('Thông báo', 'Vui lòng đăng nhập để lưu sản phẩm yêu thích', isError: true);
+      return;
+    }
+
+    // --- OPTIMISTIC UPDATE (Cập nhật UI trước) ---
+    bool currentlyFavorite = isFavorite(product.id);
+    
+    if (currentlyFavorite) {
       favorites.removeWhere((p) => p.id == product.id);
-      Get.snackbar('Đã xóa', 'Đã xóa khỏi danh sách yêu thích', 
-        snackPosition: SnackPosition.BOTTOM, duration: const Duration(milliseconds: 800));
+      _safeSnackbar('Đã xóa', 'Đã xóa khỏi mục yêu thích');
     } else {
       favorites.add(product);
-      Get.snackbar('Đã thêm', 'Đã thêm vào danh sách yêu thích',
-        snackPosition: SnackPosition.BOTTOM, duration: const Duration(milliseconds: 800));
+      _safeSnackbar('Đã thêm', 'Đã thêm vào mục yêu thích', isSuccess: true);
     }
-    saveFavorites();
+
+    // --- GỌI API ĐỒNG BỘ ---
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/toggle/'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'product_id': product.id}),
+      );
+
+      if (response.statusCode != 200) {
+        // Revert nếu API lỗi
+        if (currentlyFavorite) {
+          favorites.add(product);
+        } else {
+          favorites.removeWhere((p) => p.id == product.id);
+        }
+        _safeSnackbar('Lỗi', 'Không thể đồng bộ với server', isError: true);
+      }
+    } catch (e) {
+      print("Lỗi API Wishlist: $e");
+      // Revert nếu lỗi mạng
+      if (currentlyFavorite) favorites.add(product);
+      else favorites.removeWhere((p) => p.id == product.id);
+    }
   }
 
-  bool isFavorite(int productId) {
-    return favorites.any((p) => p.id == productId);
-  }
-
-  Future<void> saveFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
-    final List<String> jsonList = favorites.map((item) => jsonEncode(item.toJson())).toList();
-    
-    // ✅ Lưu vào Key riêng của user hiện tại
-    print("💾 Saving wishlist to key: $_storageKey");
-    await prefs.setStringList(_storageKey, jsonList);
-  }
-
-  Future<void> loadFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    // ✅ Đọc từ Key riêng của user hiện tại
-    print("📂 Loading wishlist from key: $_storageKey");
-    final List<String>? jsonList = prefs.getStringList(_storageKey);
-    
-    if (jsonList != null) {
-      favorites.assignAll(
-        jsonList.map((item) => ProductModel.fromJson(jsonDecode(item))).toList()
+  // --- HÀM HIỂN THỊ SNACKBAR AN TOÀN (FIX LỖI OVERLAY) ---
+  void _safeSnackbar(String title, String message, {bool isError = false, bool isSuccess = false}) {
+    // Chỉ hiện snackbar khi Get có context (tức là App đã dựng xong)
+    if (Get.context != null) {
+      Get.snackbar(
+        title, 
+        message,
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 1),
+        backgroundColor: isError ? Colors.red.withOpacity(0.1) : (isSuccess ? Colors.green.withOpacity(0.1) : Colors.white),
+        colorText: isError ? Colors.red : (isSuccess ? Colors.green : Colors.black),
+        margin: const EdgeInsets.all(10),
+        isDismissible: true,
       );
     } else {
-      // Nếu key này chưa có dữ liệu (user mới), làm rỗng list
-      favorites.clear();
+      print("⚠️ Warning: App chưa sẵn sàng overlay. Không thể hiện Snackbar: $message");
     }
   }
 }

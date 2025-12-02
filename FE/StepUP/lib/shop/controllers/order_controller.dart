@@ -1,65 +1,110 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:app_links/app_links.dart';
 import 'package:flutter_app/shop/controllers/cart_controller.dart';
 import 'package:flutter_app/shop/controllers/address_controller.dart';
+import 'package:flutter_app/shop/controllers/order_list_controller.dart'; 
 import 'package:flutter_app/common/widgets/success_screen/success_screen.dart';
 import 'package:flutter_app/constants/image_string.dart';
 import 'package:flutter_app/navigation_menu.dart';
+import 'package:flutter_app/shop/models/order_model.dart';
 
 class OrderController extends GetxController {
   static OrderController get instance => Get.find();
 
-  // ✅ SỬA: Dùng late final và khởi tạo bên ngoài constructor hoặc trong onInit
   late final CartController cartController;
   late final AddressController addressController;
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
 
   final isLoading = false.obs;
-  final selectedPaymentMethod = 'VNPAY'.obs; 
-  final String baseUrl = "http://10.0.2.2:8000/api/orders"; 
+  final selectedPaymentMethod = 'VNPAY'.obs;
+
+  final String baseUrl = "http://10.0.2.2:8000/api/orders";
 
   @override
   void onInit() {
     super.onInit();
     cartController = Get.put(CartController());
-    addressController = Get.put(AddressController()); 
+    addressController = Get.put(AddressController());
+    _initDeepLinkListener();
   }
 
-  // ... (Hàm processOrder giữ nguyên) ...
-  Future<void> processOrder() async {
-    // 1. Validate
-    if (cartController.selectedItems.isEmpty) {
-      Get.snackbar('Lỗi', 'Vui lòng chọn sản phẩm để thanh toán');
-      return;
+  @override
+  void onClose() {
+    _linkSubscription?.cancel();
+    super.onClose();
+  }
+
+  void _initDeepLinkListener() {
+    _appLinks = AppLinks();
+    _linkSubscription = _appLinks.uriLinkStream.listen((Uri? uri) {
+      if (uri != null) {
+        print("🔗 Nhận Deep Link: $uri");
+        _handlePaymentResult(uri);
+      }
+    }, onError: (err) {
+      print("Lỗi Deep Link: $err");
+    });
+  }
+
+  void _handlePaymentResult(Uri uri) {
+    String status = uri.queryParameters['status'] ?? '';
+    String vnpResponseCode = uri.queryParameters['vnp_ResponseCode'] ?? '';
+
+    if (status == 'success' || vnpResponseCode == '00') {
+      Get.to(() => SuccessScreen(
+            image: AppImages.checkoutsuccess,
+            title: 'Thanh toán thành công!',
+            subTitle: 'Đơn hàng của bạn đã được xác nhận.',
+            onPressed: () {
+              cartController.fetchCart(); 
+              if (Get.isRegistered<OrderListController>()) {
+                OrderListController.instance.fetchUserOrders();
+              }
+              Get.offAll(() => const NavigationMenu());
+            },
+          ));
+    } else if (status == 'cancelled') {
+      Get.defaultDialog(
+        title: "Thanh toán bị hủy",
+        middleText: "Giao dịch chưa hoàn tất.",
+        textConfirm: "Đóng",
+        onConfirm: () => Get.back(),
+      );
+    } else {
+      _showError('Thanh toán thất bại hoặc bị lỗi.');
     }
-    if (addressController.selectedAddress.value == null) {
-      Get.snackbar('Lỗi', 'Vui lòng chọn địa chỉ giao hàng');
+  }
+
+  Future<void> processOrder() async {
+    if (cartController.selectedItems.isEmpty) {
+      _showError('Vui lòng chọn sản phẩm');
       return;
     }
 
     isLoading.value = true;
 
-
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
 
-      // 2. Chuẩn bị dữ liệu gửi lên Server
-      // Backend cần: items (variant_id, quantity), address_id, payment_method
+      if (token == null) {
+        _showError('Bạn chưa đăng nhập');
+        return;
+      }
+
       final body = {
-        "items": cartController.selectedItems.map((item) => {
-          "variant_id": item.productId, // Lưu ý: Ở CartItemModel bạn gọi là productId nhưng thực chất là variantId? Kiểm tra lại model nhé.
-          // Nếu CartItemModel lưu productId là ID sản phẩm chung, bạn cần sửa CartItemModel để lưu variantId riêng.
-          // Giả sử ở đây item.productId chính là variantId (SKU ID).
-          "quantity": item.quantity
-        }).toList(),
         "address_id": addressController.selectedAddress.value!.id,
-        "payment_method": selectedPaymentMethod.value // "VNPAY" hoặc "PAYPAL"
+        "payment_method": selectedPaymentMethod.value,
+        "return_url_scheme": "myapp://payment-return"
       };
 
-      // 3. Gọi API Tạo Đơn Hàng
       final response = await http.post(
         Uri.parse('$baseUrl/create/'),
         headers: {
@@ -69,43 +114,74 @@ class OrderController extends GetxController {
         body: json.encode(body),
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = json.decode(response.body);
-        final paymentUrl = data['payment_url']; // Backend trả về URL thanh toán
+      _handleApiResponse(response);
 
-        if (paymentUrl != null && paymentUrl.isNotEmpty) {
-          // 4. Mở URL thanh toán (VNPAY/PayPal)
-          // Logic: Mở trình duyệt -> Người dùng thanh toán -> Redirect về App (Deep Link) hoặc Web Success
-          await launchUrl(Uri.parse(paymentUrl), mode: LaunchMode.externalApplication);
-          
-          // Tạm thời: Chuyển sang màn hình thành công giả định
-          // (Thực tế cần Deep Link để hứng callback từ ví điện tử)
-          Get.to(() => SuccessScreen(
-             image: AppImages.checkoutsuccess,
-             title: 'Payment Processing',
-             subTitle: 'Please complete payment in browser.',
-             onPressed: () => Get.offAll(() => const NavigationMenu()),
-          ));
-          
-          // Xóa giỏ hàng sau khi đặt (logic này nên để Server xử lý khi IPN callback thành công)
-          // cartController.clearCart(); 
-        } else {
-          // Trường hợp COD (Thanh toán khi nhận hàng)
-          Get.to(() => SuccessScreen(
-             image: AppImages.checkoutsuccess,
-             title: 'Order Success',
-             subTitle: 'Your order has been placed.',
-             onPressed: () => Get.offAll(() => const NavigationMenu()),
-          ));
-        }
-      } else {
-        Get.snackbar('Lỗi', 'Server: ${response.body}');
-      }
     } catch (e) {
-      Get.snackbar('Lỗi', 'Exception: $e');
-      print(e);
+      print("Lỗi processOrder: $e");
+      _showError('Có lỗi xảy ra khi xử lý đơn hàng');
     } finally {
       isLoading.value = false;
     }
+  }
+
+  // ✅ FIX LỖI 2: Thêm hàm repayOrder vào đây
+  Future<void> repayOrder(OrderModel order) async {
+    isLoading.value = true;
+    try {      
+      String endpoint = "";
+      if (order.paymentMethod == "VNPAY") {
+         endpoint = "http://10.0.2.2:8000/payments/vnpay/${order.id}/";
+      } else if (order.paymentMethod == "PAYPAL") {
+         endpoint = "http://10.0.2.2:8000/payments/paypal/${order.id}/";
+      }
+
+      if (endpoint.isNotEmpty) {
+         if (!await launchUrl(Uri.parse(endpoint), mode: LaunchMode.externalApplication)) {
+            _showError('Không thể mở trình duyệt thanh toán.');
+         }
+      } else {
+        _showError('Phương thức thanh toán không hỗ trợ trả lại.');
+      }
+
+    } catch (e) {
+       print("Lỗi Repay: $e");
+      _showError('Lỗi kết nối: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> _handleApiResponse(http.Response response) async {
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = json.decode(utf8.decode(response.bodyBytes));
+        final paymentUrl = data['payment_url'];
+
+        if (paymentUrl == null || paymentUrl.isEmpty) {
+             Get.to(() => SuccessScreen(
+                image: AppImages.checkoutsuccess,
+                title: 'Thành công',
+                subTitle: 'Đơn hàng COD đã tạo thành công.',
+                onPressed: () {
+                  cartController.fetchCart();
+                  Get.offAll(() => const NavigationMenu());
+                },
+              ));
+        } else {
+          final uri = Uri.parse(paymentUrl);
+          bool launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          if (!launched) _showError('Không thể mở trình duyệt thanh toán.');
+        }
+      } else {
+        _showError('Lỗi server: ${response.body}');
+      }
+  }
+
+  void _showError(String message) {
+    Get.rawSnackbar(
+      message: message,
+      backgroundColor: Colors.red,
+      duration: const Duration(seconds: 3),
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 }

@@ -8,16 +8,12 @@ class HomeController extends GetxController {
   static HomeController get instance => Get.find();
 
   final carousalCurrentIndex = 0.obs;
-
-  void updatePageIndicator(index) {
-    carousalCurrentIndex.value = index;
-  }
+  void updatePageIndicator(index) => carousalCurrentIndex.value = index;
 
   final isLoading = false.obs;
   final categoryList = <CategoryModel>[].obs;
   final productList = <ProductModel>[].obs;
 
-  // URL API (Dùng 10.0.2.2 cho máy ảo Android)
   final String baseUrl = "http://10.0.2.2:8000"; 
 
   @override
@@ -57,7 +53,7 @@ class HomeController extends GetxController {
       final response = await http.get(Uri.parse('$baseUrl/api/products/'));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));
-        // Lấy 6 sản phẩm đầu tiên
+        // Lấy 6 sản phẩm nổi bật hoặc mới nhất
         productList.value = data.map((e) => ProductModel.fromJson(e)).take(6).toList();
       }
     } catch (e) {

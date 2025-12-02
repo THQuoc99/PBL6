@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:flutter_app/constants/colors.dart';
 import 'package:flutter_app/constants/image_string.dart';
 import 'package:flutter_app/constants/sizes.dart';
@@ -6,199 +7,182 @@ import 'package:flutter_app/widgets/appbar/appbar.dart';
 import 'package:flutter_app/widgets/containers/rounded_container.dart';
 import 'package:flutter_app/widgets/image/circular_image.dart';
 import 'package:flutter_app/widgets/layouts/grid_layout.dart';
-import 'package:flutter_app/widgets/products/product_cards/product_card_vertical.dart'; // Giả sử bạn có card này
+import 'package:flutter_app/widgets/products/product_cards/product_card_vertical.dart';
 import 'package:flutter_app/widgets/products/brands/brand_titles.dart';
 import 'package:flutter_app/utils/helpers/helper_function.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
-import 'package:flutter_app/shop/services/product_service.dart';
+import 'package:flutter_app/utils/constants/enums.dart';
+import 'package:flutter_app/shop/controllers/store_controller.dart';
 
 class StoreScreen extends StatelessWidget {
-  const StoreScreen({super.key});
+  // Nhận storeId từ màn hình trước (ví dụ từ Product Detail bấm vào tên shop)
+  final String storeId;
+
+  const StoreScreen({super.key, required this.storeId});
 
   @override
   Widget build(BuildContext context) {
     final dark = HelperFunction.isDarkMode(context);
+    
+    // Khởi tạo controller và gọi hàm fetch data ngay khi build
+    final controller = Get.put(StoreController());
+    // Gọi fetch nếu chưa có dữ liệu hoặc id khác (để refresh)
+    controller.fetchStoreData(storeId);
 
-    // Dùng DefaultTabController để quản lý các tab
     return DefaultTabController(
-      length: 2, // Số lượng tab (Products, Reviews)
+      length: 2, 
       child: Scaffold(
         appBar: CusAppbar(
-          title: Text('Nike Store'), // Tên cửa hàng
+          // Hiển thị tên shop trên AppBar
+          title: Obx(() => Text(controller.store.value?.name ?? 'Loading...')), 
           showBackArrow: true,
           actions: [
-            // Nút chia sẻ (ví dụ)
             IconButton(onPressed: () {}, icon: const Icon(Icons.share)),
           ],
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(AppSizes.defaultSpace),
-          child: Column(
-            children: [
-              // --- 1. Header của Store ---
-              StoreHeader(dark: dark),
-              const SizedBox(height: AppSizes.spaceBtwSections),
+        body: Obx(() {
+          if (controller.isLoading.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          
+          final storeData = controller.store.value;
+          if (storeData == null) return const Center(child: Text("Không tìm thấy cửa hàng"));
 
-              // --- 2. Thanh Tab ---
-              TabBar(
-                tabs: [
-                  Tab(text: 'Products'),
-                  Tab(text: 'Reviews'),
-                ],
-                // Tùy chỉnh thêm cho đẹp
-                indicatorColor: AppColors.primary,
-                unselectedLabelColor: AppColors.darkGray,
-                labelColor: dark ? AppColors.white : AppColors.primary,
-              ),
-              const SizedBox(height: AppSizes.spaceBtwSections),
+          return Padding(
+            padding: const EdgeInsets.all(AppSizes.defaultSpace),
+            child: Column(
+              children: [
+                // --- 1. Header Store (Dữ liệu thật) ---
+                _buildStoreHeader(context, dark, storeData, controller),
+                const SizedBox(height: AppSizes.spaceBtwSections),
 
-              // --- 3. Nội dung Tab ---
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    // --- Tab Sản phẩm ---
-                    StoreProductsTab(),
-
-                    // --- Tab Đánh giá ---
-                    StoreReviewsTab(),
+                // --- 2. Tab Bar ---
+                TabBar(
+                  tabs: const [
+                    Tab(text: 'Sản phẩm'),
+                    Tab(text: 'Giới thiệu'), // Hoặc Reviews
                   ],
+                  indicatorColor: AppColors.primary,
+                  unselectedLabelColor: Colors.grey,
+                  labelColor: dark ? Colors.white : AppColors.primary,
                 ),
-              ),
-            ],
-          ),
-        ),
+                const SizedBox(height: AppSizes.spaceBtwSections),
+
+                // --- 3. Nội dung Tab ---
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      // Tab Sản phẩm (Dữ liệu thật)
+                      _buildProductsTab(controller),
+                      
+                      // Tab Giới thiệu (Ví dụ hiển thị mô tả)
+                      SingleChildScrollView(
+                        child: Text(storeData.description.isNotEmpty ? storeData.name : "Chưa có mô tả."),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
       ),
     );
   }
-}
 
-// --- TÁCH WIDGET CHO GỌN ---
-
-// Header của Store
-class StoreHeader extends StatelessWidget {
-  const StoreHeader({
-    super.key,
-    required this.dark,
-  });
-
-  final bool dark;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildStoreHeader(BuildContext context, bool dark, var store, StoreController controller) {
     return RoundedContainer(
       padding: const EdgeInsets.all(AppSizes.md),
       bgcolor: dark ? AppColors.darkGrey : AppColors.grey,
       child: Row(
         children: [
-          // Logo cửa hàng
+          // Logo
           CircularImage(
-            image: AppImages.football1, // Dùng logo
-            isNetworkImage: false,
-            width: 80,
-            height: 80,
+            image: (store.avatar != null && store.avatar!.isNotEmpty) 
+                ? store.avatar! 
+                : AppImages.football1, 
+            isNetworkImage: (store.avatar != null && store.avatar!.isNotEmpty),
+            width: 60, // Giảm size logo một chút nếu cần (từ 80 -> 60) cho cân đối
+            height: 60,
             bgcolor: Colors.transparent,
           ),
           const SizedBox(width: AppSizes.spaceBtwItems),
           
-          // Tên & Số sản phẩm
+          // Thông tin
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const BrandTitlesVerify(title: 'Nike'),
-                const SizedBox(height: AppSizes.spaceBtwItems / 2),
-                Text('256 products', style: Theme.of(context).textTheme.labelMedium),
+                BrandTitlesVerify(title: store.name, brandTextSize: TextSizes.large),
+                const SizedBox(height: 4),
+                
+                // Số follower
+                Obx(() => Text(
+                  '${controller.followerCount.value} người theo dõi', 
+                  style: Theme.of(context).textTheme.labelSmall // Dùng labelSmall cho gọn
+                )),
+                
+                Row(children: [
+                   const Icon(Iconsax.star, size: 12, color: Colors.amber),
+                   Text(' ${store.rating}', style: Theme.of(context).textTheme.labelSmall),
+                ]),
               ],
             ),
           ),
 
-          // Nút Follow
-          OutlinedButton(
-            onPressed: () {},
-            child: const Text('Follow'),
-          ),
+          Obx(() {
+            final isFollowing = controller.isFollowing.value;
+            
+            return SizedBox(
+              height: 32, // 1. Giới hạn chiều cao
+              width: isFollowing ? 110 : 90, // 2. Giới hạn chiều rộng (tùy chỉnh theo text)
+              child: OutlinedButton(
+                onPressed: () => controller.followStore(store.storeId),
+                style: OutlinedButton.styleFrom(
+                  // 3. Đổi màu nền/viền
+                  backgroundColor: isFollowing ? AppColors.primary : Colors.transparent,
+                  side: BorderSide(color: isFollowing ? Colors.transparent : AppColors.primary),
+                  // 4. Giảm padding để nội dung không bị chèn ép
+                  padding: const EdgeInsets.symmetric(horizontal: 8), 
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: Text(
+                  isFollowing ? 'Đang theo dõi' : 'Theo dõi',
+                  style: TextStyle(
+                    color: isFollowing ? Colors.white : AppColors.primary,
+                    fontSize: 12, // 5. Giảm kích thước chữ
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            );
+          }),
         ],
       ),
     );
   }
-}
 
-// Tab Sản phẩm
-class StoreProductsTab extends StatelessWidget {
-  const StoreProductsTab({
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Dùng GridView để hiển thị sản phẩm
-    return Scaffold(
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: EdgeInsets.all(AppSizes.defaultSpace),
-          child: Column(
-            children: [
-              // Dropdown
-              DropdownButtonFormField(
-                decoration: InputDecoration(prefixIcon: Icon(Iconsax.sort)),
-                onChanged: (value){},
-                items: ['Name', 'Price', 'Sale']
-                  .map((option) => DropdownMenuItem( value: option,child: Text(option)))
-                  .toList(),
+  Widget _buildProductsTab(StoreController controller) {
+    return Obx(() {
+      if (controller.storeProducts.isEmpty) {
+        return const Center(child: Text("Shop chưa có sản phẩm nào."));
+      }
+      
+      return SingleChildScrollView(
+        child: Column(
+           children: [
+              const SizedBox(height: AppSizes.spaceBtwItems),
+              
+              GridLayout(
+                  itemCount: controller.storeProducts.length, 
+                  itemBuilder: (_, index) => ProductCardVertical(product: controller.storeProducts[index])
               ),
-              const SizedBox(height: AppSizes.spaceBtwItems,),
-
-              //Product
-              // Use featured products as placeholder for store products
-              FutureBuilder(
-                future: ProductService.getFeaturedProducts(first: 12),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()));
-                  }
-                  final products = snapshot.data ?? [];
-                  if (products.isEmpty) return const Text('Không có sản phẩm');
-                  return GridLayout(itemCount: products.length, itemBuilder: (_, index) => ProductCardVertical(product: products[index]));
-                },
-              ),
-            ],
-          ),
+           ],
         ),
-      ),
-    );
-  }
-}
-
-// Tab Đánh giá (Ví dụ)
-class StoreReviewsTab extends StatelessWidget {
-  const StoreReviewsTab({
-    super.key,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.separated(
-      itemCount: 5,
-      shrinkWrap: true,
-      separatorBuilder: (_, __) => const SizedBox(height: AppSizes.spaceBtwItems),
-      itemBuilder: (context, index) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text("User $index", style: Theme.of(context).textTheme.titleMedium),
-                Text("14 Nov, 2025", style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-            // Thêm widget sao (RatingBar) ở đây
-            const SizedBox(height: AppSizes.spaceBtwItems / 2),
-            const Text('Sản phẩm rất tuyệt vời, đóng gói cẩn thận...'),
-          ],
-        );
-      },
-    );
+      );
+    });
   }
 }

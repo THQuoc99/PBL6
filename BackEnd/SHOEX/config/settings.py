@@ -45,9 +45,12 @@ INSTALLED_APPS = [
     "graphene_django",
     "chatbot",
     "corsheaders", 
-    "users",     
+    "users",
+    "brand",     
     "products",   
-    "cart",      # Thêm app cart
+    "cart",      
+    "collection",
+    "store",
     "orders",    
     "payments",   
     "shipments",
@@ -113,7 +116,7 @@ import os
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'shoex',        # tên database bạn tạo local (vd: shoexdata)
+        'NAME': 'shoex_new',        # tên database bạn tạo local (vd: shoexdata)
         'USER': 'postgres',         # user mặc định PostgreSQL local
         'PASSWORD': 'postgres',# thay bằng mật khẩu bạn đặt khi cài PostgreSQL
         'HOST': 'localhost',        # local database
@@ -183,4 +186,4 @@ GRAPHENE = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 import os
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = "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"

@@ -28,28 +28,40 @@ class UserRegistrationView(generics.CreateAPIView):
         # Tạo token cho người dùng vừa đăng ký
         refresh = RefreshToken.for_user(user)
         
+        # Lấy URL avatar nếu có (đề phòng user không up ảnh)
+        avatar_url = None
+        if user.avatar:
+            try:
+                avatar_url = request.build_absolute_uri(user.avatar.url)
+            except:
+                avatar_url = user.avatar.url
+
         return Response({
             "success": True,
             "message": "Đăng ký tài khoản thành công!",
             "token": str(refresh.access_token),
+            "user_id": user.id,        
             "username": user.username,
             "full_name": user.full_name, 
             "email": user.email,    
-            "user_id": user.id,        
             "phone": user.phone,  
+            # --- CÁC TRƯỜNG MỚI TỪ DB MỚI ---
+            "role": user.role,
+            "avatar": avatar_url,
+            "birth_date": user.birth_date
         }, status=status.HTTP_201_CREATED)
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     """
     API Endpoint để Đăng nhập (Login).
-    Sử dụng Serializer đã tùy chỉnh.
+    Sử dụng Serializer đã tùy chỉnh để trả về full info + avatar.
     """
     serializer_class = CustomTokenObtainPairSerializer
     
 class UserProfileView(generics.RetrieveUpdateAPIView):
     """
     API Endpoint để LẤY (GET) và CẬP NHẬT (PATCH)
-    thông tin người dùng (full_name, phone, email).
+    thông tin người dùng (full_name, phone, email, avatar, birth_date).
     """
     queryset = User.objects.all()
     serializer_class = UserProfileSerializer
@@ -67,4 +79,8 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         self.perform_update(serializer)
 
         # Trả về dữ liệu mới nhất (đã cập nhật)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response({
+            "success": True,
+            "message": "Cập nhật thông tin thành công",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
