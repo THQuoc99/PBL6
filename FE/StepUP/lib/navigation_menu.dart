@@ -30,7 +30,7 @@ class _NavigationMenuState extends State<NavigationMenu> {
             NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
             NavigationDestination(icon: Icon(Icons.favorite), label: 'Favorite'),
             NavigationDestination(icon: Icon(Icons.shopping_basket), label: 'My Order'),
-            NavigationDestination(icon: Icon(Icons.shopping_bag), label: 'Cart'),
+            //NavigationDestination(icon: Icon(Icons.shopping_bag), label: 'Cart'),
             NavigationDestination(icon: Icon(Icons.person), label: 'Profile'),
           ],
         ),
@@ -51,7 +51,7 @@ class NavigationController {
   const HomeScreen(),
   const FavoriteScreen(),
   const OrderScreen(),
-  const CartScreen(),
+  //const CartScreen(),
   const SettingScreen(),
 ];
 

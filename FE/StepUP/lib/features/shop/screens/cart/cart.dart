@@ -12,7 +12,7 @@ class CartScreen extends StatelessWidget {
 
   const CartScreen({
     super.key,
-    this.showBackArrow = false,
+    this.showBackArrow = true,
   });
 
   @override

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/features/shop/screens/cart/cart.dart';
 import 'package:flutter_app/screens/chatbox/chatbox.dart';
 import 'package:flutter_app/widgets/appbar/appbar.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart'; // <-- 1. Thêm import
@@ -42,8 +43,16 @@ class HomeAppBar extends StatelessWidget {
             Get.to(() => const MyChatScreen());
           },
         ),
+        
+        IconButton(
+          icon: const Icon(Iconsax.shopping_cart, color: Colors.white),
+          onPressed: () {
+            // Xử lý khi nhấn vào biểu tượng chat
+            Get.to(() => const CartScreen());
+          },
+        ),
 
-        // Icon thông báo (đã có)
+        // Icon thông báo 
         Stack(
           children: [
             IconButton(

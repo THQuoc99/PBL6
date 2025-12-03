@@ -60,7 +60,7 @@ def classify_intent(user_question):
                 "Content-Type": "application/json"
             },
             json={
-                "model": "x-ai/grok-4.1-fast:free", # Hoặc model bạn cấu hình
+                "model": "google/gemini-2.0-flash-001", # Hoặc model bạn cấu hình
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.1
             },
@@ -278,7 +278,7 @@ def get_llm_response(context_data, user_question, search_criteria=None):
             "https://openrouter.ai/api/v1/chat/completions",
             headers={"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"},
             json={
-                "model": "x-ai/grok-4.1-fast:free",
+                "model": "google/gemini-2.0-flash-001",
                 "messages": [{"role": "user", "content": prompt}]
             },
             timeout=10
