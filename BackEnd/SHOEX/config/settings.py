@@ -28,7 +28,7 @@ DEBUG = True
 ALLOWED_HOSTS = [
     '127.0.0.1', 
     'localhost', 
-    'successive-idella-unsparingly.ngrok-free.dev',
+    'albertina-nonportable-jolynn.ngrok-free.dev ',
     '10.0.2.2',
 ]
 
@@ -186,4 +186,4 @@ GRAPHENE = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 import os
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = "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"
