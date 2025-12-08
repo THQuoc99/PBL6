@@ -26,11 +26,9 @@ class ProductCardVertical extends StatelessWidget {
     final wishlistController = Get.put(WishlistController());
 
     // Xử lý URL ảnh
-    String imageUrl = product.image ?? "";
-    if (imageUrl.startsWith("/media")) {
-      imageUrl = "http://10.0.2.2:8000$imageUrl";
-    }
-    final isNetworkImage = imageUrl.startsWith('http');
+    // Ảnh được lưu ở: media/product/{productId}/{productId}_0.jpg
+    String imageUrl = "http://10.0.2.2:8000/media/product/${product.id}/${product.id}_0.jpg";
+    final isNetworkImage = true;
     
     // Giả lập dữ liệu hiển thị (vì backend chưa trả về discount/rating cụ thể cho từng sp)
     final double originalPrice = product.price * 1.1; // Giả sử giá gốc cao hơn 10%

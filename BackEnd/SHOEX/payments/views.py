@@ -19,7 +19,7 @@ class DeepLinkRedirect(HttpResponseRedirect):
 
 # ------------------ CẤU HÌNH CHUNG ------------------
 # Thay bằng domain ngrok của bạn hoặc http://10.0.2.2:8000 nếu chạy local hoàn toàn
-NGROK_HOST = "https://albertina-nonportable-jolynn.ngrok-free.dev " 
+NGROK_HOST = "https://albertina-nonportable-jolynn.ngrok-free.dev"
 USD_RATE = 26360.0
 
 # ------------------ PAYPAL CONFIG ------------------

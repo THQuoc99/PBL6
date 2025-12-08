@@ -28,7 +28,7 @@ DEBUG = True
 ALLOWED_HOSTS = [
     '127.0.0.1', 
     'localhost', 
-    'albertina-nonportable-jolynn.ngrok-free.dev ',
+    'albertina-nonportable-jolynn.ngrok-free.dev',
     '10.0.2.2',
 ]
 
@@ -116,7 +116,7 @@ import os
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'shoex02',        # tên database bạn tạo local (vd: shoexdata)
+        'NAME': 'shoex01',        # tên database bạn tạo local (vd: shoexdata)
         'USER': 'postgres',         # user mặc định PostgreSQL local
         'PASSWORD': 'sinon2108',# thay bằng mật khẩu bạn đặt khi cài PostgreSQL
         'HOST': 'localhost',        # local database

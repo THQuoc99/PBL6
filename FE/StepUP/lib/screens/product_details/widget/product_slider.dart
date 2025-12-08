@@ -20,21 +20,16 @@ class ProductSlider extends StatelessWidget {
   });
 
   String _getImageUrl(String? img) {
-    if (img == null || img.isEmpty) return AppImages.sabrina;
-    String url = img;
-    if (url.startsWith('/media')) {
-      return 'http://10.0.2.2:8000$url';
-    }
-    return url;
+    // Ảnh được lưu ở: media/product/{productId}/{productId}_0.jpg
+    return 'http://10.0.2.2:8000/media/product/${product.id}/${product.id}_0.jpg';
   }
 
   @override
   Widget build(BuildContext context) {
-    // ✅ KHỞI TẠO CONTROLLER
     final wishlistController = Get.put(WishlistController());
     
     final mainImage = _getImageUrl(product.image);
-    final isNetworkImage = mainImage.startsWith('http');
+    final isNetworkImage = true; // Luôn là network image từ media folder
 
     return CurvedEdgeWidget(
       child: Container(
