@@ -1,4 +1,5 @@
 Chạy file từ terminal........BackEnd : manage.py runserver
 
 python manage.py makemigrations
-python manage.py migrate
+python manage.py migrate2025-12-23T17:59:18.527735+00:00 USE voucher=FREE50K user=8 order=21 discount=50000.00
+2025-12-23T17:59:18.541787+00:00 USE voucher=FREESHIP_TEST_20251223 user=8 order=21 discount=50000.01

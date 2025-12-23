@@ -4,6 +4,7 @@ from .views import (
     CustomTokenObtainPairView,
     UserProfileView,
     ChangePasswordView,
+    UploadAvatarView,
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -13,5 +14,5 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('profile/', UserProfileView.as_view(), name='user_profile'),
     path('change_password/', ChangePasswordView.as_view(), name='change_password'),
-    
+    path('avatar/', UploadAvatarView.as_view(), name='user_avatar'),
 ]

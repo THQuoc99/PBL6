@@ -166,10 +166,13 @@ class CartScreen extends StatelessWidget {
                           ),
                           child: Builder(builder: (context) {
                             String imageUrl = item.image ?? '';
+                            if ((imageUrl.isEmpty || imageUrl == null) && item.productId != null) {
+                              imageUrl = "http://10.0.2.2:8000/media/products/${item.productId}/${item.productId}_0.jpg";
+                            }
                             if (imageUrl.startsWith('/media')) {
                               imageUrl = 'http://10.0.2.2:8000$imageUrl';
                             }
-
+                          
                             if (imageUrl.isNotEmpty) {
                               return ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
@@ -185,10 +188,10 @@ class CartScreen extends StatelessWidget {
                                       child: CircularProgressIndicator(strokeWidth: 2),
                                     );
                                   },
-                                ),
-                              );
+                               ),
+                             );
                             }
-
+                          
                             return const Icon(Icons.image, color: Colors.grey);
                           }),
                         ),

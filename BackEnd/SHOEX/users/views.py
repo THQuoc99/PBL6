@@ -10,6 +10,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 
 
 class ChangePasswordView(APIView):
@@ -104,6 +105,7 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     queryset = User.objects.all()
     serializer_class = UserProfileSerializer
     permission_classes = [IsAuthenticated] # Chỉ cho phép người đã đăng nhập
+    parser_classes = [JSONParser, MultiPartParser, FormParser]  # Cho phép tải lên tệp tin
 
     def get_object(self):
         # Trả về thông tin của chính user đang gửi request
@@ -122,3 +124,24 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
             "message": "Cập nhật thông tin thành công",
             "data": serializer.data
         }, status=status.HTTP_200_OK)
+
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+
+class UploadAvatarView(APIView):
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        avatar_file = request.FILES.get('avatar')
+        if not avatar_file:
+            return Response({'success': False, 'message': 'Không tìm thấy file avatar'}, status=400)
+        user = request.user
+        user.avatar = avatar_file
+        user.save()
+        try:
+            avatar_url = request.build_absolute_uri(user.avatar.url)
+        except:
+            avatar_url = user.avatar.url
+        return Response({'success': True, 'avatar': avatar_url}, status=200)

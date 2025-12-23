@@ -5,7 +5,6 @@ import 'package:flutter_app/constants/sizes.dart';
 import 'package:flutter_app/utils/helpers/helper_function.dart';
 import 'package:flutter_app/widgets/containers/rounded_container.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
-import 'package:flutter_app/shop/controllers/order_list_controller.dart';
 import 'package:flutter_app/shop/models/order_model.dart';
 import 'package:flutter_app/features/shop/screens/order/order_detail_screen.dart';
 

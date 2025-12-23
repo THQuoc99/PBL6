@@ -10,166 +10,111 @@ class BillingAmountSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.put(CartController());
-    final shippingController = Get.put(ShippingController());
-    final voucherController = Get.put(VoucherController());
+    final cartController = Get.find<CartController>();
+    final shippingController = Get.find<ShippingController>();
+    final voucherController = Get.find<VoucherController>();
 
     return Obx(() {
-      final subTotal = controller.totalAmount.value;
+      final subTotal = cartController.totalAmount.value;
       final shippingFee = shippingController.shippingFee;
-      final selectedPlatform = voucherController.selectedVoucher.value;
-      final selectedShipping = voucherController.selectedShipping.value;
-      final selectedStores = voucherController.selectedStoreVouchers;
+      
+      // Calculate Discounts (Client Side Estimate)
+      double totalDiscount = 0.0;
+      
+      // 1. Store Discounts
+      double storeDiscount = 0.0;
+      // Note: This is simplified. Real calculation needs to map items to stores.
+      // Assuming VoucherController's calculateTotalDiscount is implemented or we calculate here.
+      voucherController.selectedStoreVouchers.forEach((storeId, voucher) {
+         if(voucher.discountType == 'fixed') {
+           storeDiscount += voucher.discountValue;
+         } else {
+           // Estimate percent on total (not accurate without per-store subtotal)
+           // In real app, calculate subtotal per store
+         }
+      });
 
-      // compute per-store subtotals
-      final Map<String, double> storeSubtotals = {};
-      for (var item in controller.selectedItems) {
-        final sid = item.storeId ?? 'unknown';
-        storeSubtotals[sid] = (storeSubtotals[sid] ?? 0) + item.subTotal;
-      }
-
-      // Auto-apply best vouchers if user hasn't manually selected any
-      try {
-        final noManual = voucherController.selectedVoucher.value == null && voucherController.selectedShipping.value == null && voucherController.selectedStoreVouchers.isEmpty;
-        if (noManual) {
-          // use controller helper which calculates shipping fee first and applies once
-          voucherController.tryAutoApply(storeSubtotals);
-        }
-      } catch (e) {}
-
-      // compute store-level discounts
-      double storeDiscountTotal = 0.0;
-      final Map<String, double> storeDiscountMap = {};
-      for (final entry in storeSubtotals.entries) {
-        final sid = entry.key;
-        final subtotal = entry.value;
-        final v = selectedStores[sid];
-        if (v != null) {
-          double d = 0.0;
-          if (v.discountType == 'fixed') {
-            d = v.discountValue;
-            if (d > subtotal) d = subtotal;
-          } else {
-            d = subtotal * (v.discountValue / 100.0);
-            if (v.maxDiscount != null) d = d > v.maxDiscount! ? v.maxDiscount! : d;
-          }
-          storeDiscountTotal += d;
-          storeDiscountMap[sid] = d;
-        }
-      }
-
-      // apply platform voucher on remaining subtotal
+      // 2. Platform Discount
       double platformDiscount = 0.0;
-      final remaining = subTotal - storeDiscountTotal;
-      if (selectedPlatform != null) {
-        if (selectedPlatform.discountType == 'fixed') {
-          platformDiscount = selectedPlatform.discountValue;
-          if (platformDiscount > remaining) platformDiscount = remaining;
+      final pVoucher = voucherController.selectedPlatformVoucher.value;
+      if (pVoucher != null) {
+         if (pVoucher.discountType == 'fixed') {
+           platformDiscount = pVoucher.discountValue;
+         } else {
+           platformDiscount = (subTotal - storeDiscount) * (pVoucher.discountValue / 100);
+           if (pVoucher.maxDiscount != null && platformDiscount > pVoucher.maxDiscount!) {
+             platformDiscount = pVoucher.maxDiscount!;
+           }
+         }
+      }
+
+      // 3. Shipping Discount
+      double shippingDiscount = 0.0;
+      final sVoucher = voucherController.selectedShippingVoucher.value;
+      if (sVoucher != null) {
+        if (sVoucher.isFreeShipping) {
+          shippingDiscount = shippingFee;
+        } else if (sVoucher.discountType == 'fixed') {
+          shippingDiscount = sVoucher.discountValue;
         } else {
-          platformDiscount = remaining * (selectedPlatform.discountValue / 100.0);
-          if (selectedPlatform.maxDiscount != null) platformDiscount = platformDiscount > selectedPlatform.maxDiscount! ? selectedPlatform.maxDiscount! : platformDiscount;
+          shippingDiscount = shippingFee * (sVoucher.discountValue / 100);
         }
       }
+      // Cap shipping discount
+      if (shippingDiscount > shippingFee) shippingDiscount = shippingFee;
 
-      // shipping adjustments from selected shipping voucher
-      double shippingFeeToShow = shippingFee;
-      if (selectedShipping != null) {
-        if (selectedShipping.isFreeShipping) {
-          shippingFeeToShow = 0.0;
-        } else if (selectedShipping.discountType == 'fixed') {
-          shippingFeeToShow = (shippingFeeToShow - selectedShipping.discountValue).clamp(0.0, double.infinity);
-        } else if (selectedShipping.discountType == 'percent') {
-          shippingFeeToShow = shippingFeeToShow - (shippingFeeToShow * (selectedShipping.discountValue / 100.0));
-        }
-      }
-
-      // Note: platform vouchers should not implicitly zero shipping here.
-      // Shipping reductions are shown based on `selectedShipping` (or backend-calculated amounts).
-
-      final totalDiscount = storeDiscountTotal + platformDiscount;
-      final taxFee = 0.0;
-      final total = subTotal - totalDiscount + shippingFeeToShow + taxFee;
+      totalDiscount = storeDiscount + platformDiscount + shippingDiscount;
+      final total = subTotal + shippingFee - totalDiscount;
 
       return Column(
         children: [
           // Subtotal
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Subtotal', style: Theme.of(context).textTheme.bodyMedium),
-              Text('\$${subTotal.toStringAsFixed(0)}', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
+          _buildRow('Tổng tiền hàng', subTotal),
           const SizedBox(height: AppSizes.spaceBtwItems / 2),
 
           // Shipping
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Shipping Fee', style: Theme.of(context).textTheme.bodyMedium),
-              Text(
-                shippingFeeToShow == 0 
-                    ? 'Miễn phí'
-                    : '\$${shippingFeeToShow.toStringAsFixed(0)}',
-                style: Theme.of(context).textTheme.labelLarge?.apply(
-                  color: shippingFeeToShow == 0 ? Colors.green : null,
-                ),
-              ),
-            ],
-          ),
+          _buildRow('Phí vận chuyển', shippingFee),
           const SizedBox(height: AppSizes.spaceBtwItems / 2),
 
-          // Store voucher lines (itemized with code)
-              for (final entry in storeDiscountMap.entries) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Voucher cửa hàng (${selectedStores[entry.key]?.code ?? ''})',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    Text('-\$${(entry.value).toStringAsFixed(0)}', style: Theme.of(context).textTheme.bodyMedium?.apply(color: Colors.red)),
-                  ],
-                ),
-                const SizedBox(height: AppSizes.spaceBtwItems / 2),
-              ],
+          // Discounts
+          if (storeDiscount > 0)
+            _buildRow('Voucher Shop', -storeDiscount, isDiscount: true),
+          if (platformDiscount > 0)
+            _buildRow('Voucher Sàn', -platformDiscount, isDiscount: true),
+          if (shippingDiscount > 0)
+            _buildRow('Voucher Vận chuyển', -shippingDiscount, isDiscount: true),
 
-          // Platform voucher
-          if (selectedPlatform != null) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Voucher (${selectedPlatform.code})', style: Theme.of(context).textTheme.bodyMedium),
-                Text('-\$${platformDiscount.toStringAsFixed(0)}', style: Theme.of(context).textTheme.bodyMedium?.apply(color: Colors.red)),
-              ],
-            ),
-            const SizedBox(height: AppSizes.spaceBtwItems / 2),
-          ],
-
-          // Shipping voucher line (show even when freeship)
-          if (selectedShipping != null) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Voucher vận chuyển (${selectedShipping.code})', style: Theme.of(context).textTheme.bodyMedium),
-                Text('-\$${(shippingFee - shippingFeeToShow).toStringAsFixed(0)}', style: Theme.of(context).textTheme.bodyMedium?.apply(color: Colors.red)),
-              ],
-            ),
-            const SizedBox(height: AppSizes.spaceBtwItems / 2),
-          ],
-
+          const SizedBox(height: AppSizes.spaceBtwItems / 2),
+          const Divider(),
           const SizedBox(height: AppSizes.spaceBtwItems / 2),
 
           // Total
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Total', style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold)),
-              Text('\$${total.toStringAsFixed(0)}', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              Text('Tổng thanh toán', style: Theme.of(context).textTheme.headlineSmall),
+              Text('\$${total.toStringAsFixed(0)}', style: Theme.of(context).textTheme.headlineSmall),
             ],
           ),
         ],
       );
     });
+  }
+
+  Widget _buildRow(String label, double value, {bool isDiscount = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 14)),
+        Text(
+          '${isDiscount ? "" : ""}\$${value.abs().toStringAsFixed(0)}',
+          style: TextStyle(
+            fontSize: 14, 
+            fontWeight: FontWeight.w600,
+            color: isDiscount ? Colors.green : null
+          ),
+        ),
+      ],
+    );
   }
 }

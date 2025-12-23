@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/constants/colors.dart';
 import 'package:flutter_app/constants/image_string.dart';
-import 'package:flutter_app/constants/sizes.dart';
 import 'package:flutter_app/utils/constants/enums.dart';
 import 'package:flutter_app/features/shop/screens/store/store_screen.dart'; 
-import 'package:flutter_app/widgets/containers/rounded_container.dart';
 import 'package:flutter_app/widgets/image/circular_image.dart';
 import 'package:flutter_app/widgets/products/brands/brand_titles.dart';
-import 'package:flutter_app/widgets/texts/product_price_text.dart';
-import 'package:flutter_app/widgets/texts/product_title_text.dart';
 import 'package:get/get.dart';
 import 'package:flutter_app/shop/models/product_model.dart';
 

@@ -188,7 +188,7 @@ GRAPHENE = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 import os
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = "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"
 
 # GHTK API Configuration
 GHTK_API_TOKEN = os.environ.get('GHTK_API_TOKEN', '31UD27vahdTHKrYxtrtmp2TNOoorsrtC3IUFFHD')

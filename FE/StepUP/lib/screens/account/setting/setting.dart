@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter_app/features/personalization/screens/address/address.dart';
 import 'package:flutter_app/screens/account/profile/profile.dart';
+import 'package:flutter_app/screens/account/profile/edit_profile_screen.dart';
 import 'package:flutter_app/screens/notification/notification_screen.dart';
 import 'package:flutter_app/screens/account/voucher/voucher_screen.dart';
 import 'package:flutter_app/screens/account/security/security_screen.dart';
@@ -51,14 +52,20 @@ class SettingScreen extends StatelessWidget {
 
                   // User Profile Card (Sử dụng Obx để cập nhật dữ liệu realtime)
                   Obx(
-                    () => UserProfileTitle(
-                      // Hiển thị loading nếu tên đang trống (tuỳ chọn)
-                      title: userController.fullName.value.isEmpty 
-                          ? 'Loading...' 
-                          : userController.fullName.value,
-                      subtitle: userController.email.value,
-                      onPressed: () => Get.to(() => const ProfileScreen()),
-                    ),
+                    () {
+                      final avatar = userController.avatar.value;
+                      final isNetwork = avatar.isNotEmpty;
+                      final display = isNetwork
+                          ? (avatar.startsWith('/') ? 'http://10.0.2.2:8000$avatar' : avatar)
+                          : null;
+                      return UserProfileTitle(
+                        title: userController.fullName.value.isEmpty ? 'Loading...' : userController.fullName.value,
+                        subtitle: userController.email.value,
+                        onPressed: () => Get.to(() => const ProfileScreen()),
+                        imageUrl: display,
+                        isNetwork: isNetwork,
+                      );
+                    },
                   ),
                   const SizedBox(height: AppSizes.spaceBtwSections),
                 ],
@@ -87,7 +94,7 @@ class SettingScreen extends StatelessWidget {
                     subtitle: 'Chỉnh sửa thông tin cá nhân',
                     title: 'Hồ sơ của tôi',
                     // Điều hướng vào trang Profile giống như click vào header
-                    onTap: () => Get.to(() => const ProfileScreen()),
+                    onTap: () => Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const EditProfileScreen())),
                   ),
                   SettingMenuTitle(
                     icon: Iconsax.notification,

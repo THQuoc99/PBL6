@@ -21,6 +21,9 @@ class OrderController extends GetxController {
 
   late final CartController cartController;
   late final AddressController addressController;
+  late final VoucherController voucherController; // Thêm voucher controller
+  late final ShippingController shippingController; // Thêm shipping controller
+
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
 
@@ -28,13 +31,29 @@ class OrderController extends GetxController {
   final selectedPaymentMethod = 'VNPAY'.obs;
   final noteController = TextEditingController();
 
+  // Base URL API
   final String baseUrl = "http://10.0.2.2:8000/api/orders";
+  // Root URL cho Payment (cắt bỏ phần /api/orders)
+  String get rootUrl => "http://10.0.2.2:8000"; 
 
   @override
   void onInit() {
     super.onInit();
     cartController = Get.put(CartController());
     addressController = Get.put(AddressController());
+    // Khởi tạo các controller khác nếu chưa có
+    if (Get.isRegistered<VoucherController>()) {
+      voucherController = Get.find<VoucherController>();
+    } else {
+      voucherController = Get.put(VoucherController());
+    }
+    
+    if (Get.isRegistered<ShippingController>()) {
+      shippingController = Get.find<ShippingController>();
+    } else {
+      shippingController = Get.put(ShippingController());
+    }
+
     _initDeepLinkListener();
   }
 
@@ -58,14 +77,16 @@ class OrderController extends GetxController {
   }
 
   void _handlePaymentResult(Uri uri) {
+    // Xử lý deep link trả về từ VNPAY/PayPal
     String status = uri.queryParameters['status'] ?? '';
     String vnpResponseCode = uri.queryParameters['vnp_ResponseCode'] ?? '';
 
+    // Logic kiểm tra thành công
     if (status == 'success' || vnpResponseCode == '00') {
-      Get.to(() => SuccessScreen(
+      Get.offAll(() => SuccessScreen(
             image: AppImages.checkoutsuccess,
             title: 'Thanh toán thành công!',
-            subTitle: 'Đơn hàng của bạn đã được xác nhận.',
+            subTitle: 'Đơn hàng của bạn đã được xác nhận và đang xử lý.',
             onPressed: () {
               cartController.fetchCart(); 
               if (Get.isRegistered<OrderListController>()) {
@@ -77,18 +98,25 @@ class OrderController extends GetxController {
     } else if (status == 'cancelled') {
       Get.defaultDialog(
         title: "Thanh toán bị hủy",
-        middleText: "Giao dịch chưa hoàn tất.",
+        middleText: "Bạn đã hủy giao dịch thanh toán.",
         textConfirm: "Đóng",
+        confirmTextColor: Colors.white,
         onConfirm: () => Get.back(),
       );
     } else {
-      _showError('Thanh toán thất bại hoặc bị lỗi.');
+      _showError('Thanh toán thất bại. Vui lòng thử lại.');
     }
   }
 
+  /// Hàm tạo đơn hàng chính
   Future<void> processOrder() async {
+    // 1. Validate cơ bản
     if (cartController.selectedItems.isEmpty) {
-      _showError('Vui lòng chọn sản phẩm');
+      _showError('Vui lòng chọn sản phẩm để thanh toán');
+      return;
+    }
+    if (addressController.selectedAddress.value == null) {
+      _showError('Vui lòng chọn địa chỉ giao hàng');
       return;
     }
 
@@ -99,154 +127,33 @@ class OrderController extends GetxController {
       final token = prefs.getString('token');
 
       if (token == null) {
-        _showError('Bạn chưa đăng nhập');
+        _showError('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.');
         return;
       }
 
-      final shippingController = Get.find<ShippingController>();
-      final voucherController = Get.find<VoucherController>();
+      // 2. Chuẩn bị dữ liệu Voucher
+      // Sử dụng hàm getVouchersForOrder() đã viết trong VoucherController
+      // Hàm này trả về Map chuẩn: {"store_id": "CODE", "platform": "CODE", "shipping": "CODE"}
+      final vouchersMap = voucherController.getVouchersForOrder();
 
-      // Tính subtotal theo store để back-end áp voucher per-store
-      final Map<String, double> storeSubtotals = {};
-      for (var item in cartController.selectedItems) {
-        final sid = item.storeId ?? 'unknown';
-        storeSubtotals[sid] = (storeSubtotals[sid] ?? 0) + item.subTotal;
-      }
-
-      // Nếu user đã chọn voucher thủ công, dùng voucher đó; nếu không thì chọn tự động
-      Map<String, String> vouchersMap = {};
-      final selected = voucherController.selectedVoucher.value;
-      if (selected != null) {
-        if (selected.type == 'platform') {
-          vouchersMap['platform'] = selected.code;
-        } else {
-          // apply as store voucher to all stores if applicable, otherwise try to map by seller id
-          if (selected.applicableStores != null && selected.applicableStores!.isNotEmpty) {
-            for (final sid in selected.applicableStores!) {
-              vouchersMap['$sid'] = selected.code;
-            }
-          } else if (selected.id != null && selected.type == 'store') {
-            // fallback: apply to first store in cart that matches voucher.seller
-            for (final sid in storeSubtotals.keys) {
-              vouchersMap[sid] = selected.code;
-            }
-          }
-        }
-      } else {
-        // Chọn voucher tự động nếu có
-        // Ensure shipping fee is calculated so autoApplyBest can evaluate shipping vouchers
-        try {
-          await shippingController.calculateShippingFee();
-        } catch (_) {}
-        vouchersMap = await voucherController.autoApplyBest(storeSubtotals);
-
-        // Reflect auto-applied selection in UI/controllers so user sees selected platform/shipping/store vouchers
-        if (vouchersMap.isNotEmpty) {
-          // platform
-          final pcode = vouchersMap['platform'];
-          if (pcode != null) {
-            final vm = voucherController.vouchers.firstWhereOrNull((v) => v.code == pcode) ?? voucherController.myVouchers.firstWhereOrNull((v) => v.code == pcode);
-            if (vm != null) voucherController.selectedVoucher.value = vm;
-          }
-          // shipping
-          final scode = vouchersMap['shipping'];
-          if (scode != null) {
-            final sm = voucherController.vouchers.firstWhereOrNull((v) => v.code == scode) ?? voucherController.myVouchers.firstWhereOrNull((v) => v.code == scode);
-            if (sm != null) voucherController.selectedShipping.value = sm;
-          }
-          // store vouchers
-          for (final entry in vouchersMap.entries) {
-            final key = entry.key;
-            if (key == 'platform' || key == 'shipping') continue;
-            final code = entry.value;
-            final vm = voucherController.vouchers.firstWhereOrNull((v) => v.code == code) ?? voucherController.myVouchers.firstWhereOrNull((v) => v.code == code);
-            if (vm != null) voucherController.selectedStoreVouchers[key] = vm;
-          }
-          voucherController.selectedStoreVouchers.refresh();
-        }
-      }
-
-      // Include any manually selected store vouchers and shipping voucher
-      // selectedStoreVouchers keys are store ids
-      for (final entry in voucherController.selectedStoreVouchers.entries) {
-        vouchersMap[entry.key] = entry.value.code;
-      }
-      final selectedShipping = voucherController.selectedShipping.value;
-      if (selectedShipping != null) {
-        // Prefer explicit shipping voucher key when voucher type is 'shipping' or it is marked freeship
-        if (selectedShipping.type == 'shipping' || selectedShipping.isFreeShipping == true) {
-          vouchersMap['shipping'] = selectedShipping.code;
-        } else if (selectedShipping.type == 'platform') {
-          // If no platform voucher yet and shipping is platform-type, apply to platform
-          if (!vouchersMap.containsKey('platform')) {
-            vouchersMap['platform'] = selectedShipping.code;
-          } else {
-            // otherwise add as a separate key so backend can inspect it if supports
-            vouchersMap['platform_shipping'] = selectedShipping.code;
-          }
-        } else {
-          // assign to applicable stores or all
-          if (selectedShipping.applicableStores != null && selectedShipping.applicableStores!.isNotEmpty) {
-            for (final sid in selectedShipping.applicableStores!) {
-              vouchersMap['$sid'] = selectedShipping.code;
-            }
-          } else {
-            for (final sid in storeSubtotals.keys) {
-              vouchersMap[sid] = selectedShipping.code;
-            }
-          }
-        }
-      }
-
-      // Reserve các voucher đã chọn để tránh race (unique codes only)
-      final reservedIds = <int>[];
-      final codesToReserve = vouchersMap.values.toSet();
-      for (final code in codesToReserve) {
-        final rid = await voucherController.reserveVoucher(code, seconds: 300);
-        if (rid != null) reservedIds.add(rid);
-      }
-
-      // Determine shipping fee to send. Prefer backend-validated shipping voucher reductions.
+      // 3. Chuẩn bị Shipping Fee
+      // Gửi phí ship gốc (tính toán từ GHTK/GHN...). 
+      // Backend sẽ tự trừ nếu có mã voucher 'shipping' trong vouchersMap.
       double shippingFeeToSend = shippingController.shippingFee;
-      // If a shipping-specific voucher was selected/auto-applied, ask backend how much it reduces.
-      if (vouchersMap.containsKey('shipping')) {
-        final scode = vouchersMap['shipping']!;
-        try {
-          final check = await voucherController.checkVoucher(scode, null, target: 'shipping', shippingFee: shippingFeeToSend);
-          if (check != null && check['valid'] == true) {
-            final dam = check['discount_amount'];
-            double reduction = 0.0;
-            if (dam is num) reduction = dam.toDouble(); else reduction = double.tryParse('$dam') ?? 0.0;
-            shippingFeeToSend = (shippingFeeToSend - reduction).clamp(0.0, double.infinity);
-          }
-        } catch (e) {
-          print('Error checking shipping voucher $scode: $e');
-        }
-      } else if (vouchersMap.containsKey('platform')) {
-        // As a fallback, allow platform voucher to reduce shipping only if backend confirms it (target=shipping)
-        final pcode = vouchersMap['platform']!;
-        try {
-          final checkP = await voucherController.checkVoucher(pcode, null, target: 'shipping', shippingFee: shippingFeeToSend);
-          if (checkP != null && checkP['valid'] == true) {
-            final dam = checkP['discount_amount'];
-            double reduction = 0.0;
-            if (dam is num) reduction = dam.toDouble(); else reduction = double.tryParse('$dam') ?? 0.0;
-            shippingFeeToSend = (shippingFeeToSend - reduction).clamp(0.0, double.infinity);
-          }
-        } catch (e) {
-          print('Error checking platform-as-shipping $pcode: $e');
-        }
-      }
 
+      // 4. Tạo Body Request
       final body = {
         "address_id": addressController.selectedAddress.value!.id,
-        "payment_method": selectedPaymentMethod.value,
+        "payment_method": selectedPaymentMethod.value, // "COD", "VNPAY", "PAYPAL"
         "shipping_fee": shippingFeeToSend,
-        "vouchers": vouchersMap,
+        "vouchers": vouchersMap, // Gửi map voucher lên
         "notes": noteController.text.trim(),
-        "return_url_scheme": "myapp://payment-return"
+        "return_url_scheme": "myapp://payment-return" // Scheme cấu hình trong AndroidManifest/Info.plist
       };
 
+      print("📤 Sending Order Request: ${jsonEncode(body)}");
+
+      // 5. Gọi API
       final response = await http.post(
         Uri.parse('$baseUrl/create/'),
         headers: {
@@ -256,42 +163,60 @@ class OrderController extends GetxController {
         body: json.encode(body),
       );
 
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        // release reservations on failure
+      print("📥 Response Status: ${response.statusCode}");
+      print("📥 Response Body: ${utf8.decode(response.bodyBytes)}");
+
+      // 6. Xử lý kết quả
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _handleApiResponse(response);
+      } else {
+        // Parse lỗi từ server trả về
+        final errorData = json.decode(utf8.decode(response.bodyBytes));
+        String errorMessage = errorData['error'] ?? 'Tạo đơn hàng thất bại';
+        
+        // Nếu lỗi liên quan đến voucher, release reservation (nếu có dùng logic reserve)
         await voucherController.releaseAllReservations();
+        
+        _showError(errorMessage);
       }
 
-      _handleApiResponse(response);
-
     } catch (e) {
-      print("Lỗi processOrder: $e");
-      _showError('Có lỗi xảy ra khi xử lý đơn hàng');
+      print("❌ Lỗi processOrder: $e");
+      _showError('Lỗi kết nối hoặc xử lý: $e');
     } finally {
       isLoading.value = false;
     }
   }
 
-  // ✅ FIX LỖI 2: Thêm hàm repayOrder vào đây
+  /// Hàm thanh toán lại cho đơn hàng cũ (Repay)
   Future<void> repayOrder(OrderModel order) async {
     isLoading.value = true;
     try {      
       String endpoint = "";
+      
+      // Xây dựng URL thanh toán dựa trên rootUrl để tránh hardcode sai IP
       if (order.paymentMethod == "VNPAY") {
-         endpoint = "http://10.0.2.2:8000/payments/vnpay/${order.id}/";
+         endpoint = "$rootUrl/payments/vnpay/${order.id}/";
       } else if (order.paymentMethod == "PAYPAL") {
-         endpoint = "http://10.0.2.2:8000/payments/paypal/${order.id}/";
+         endpoint = "$rootUrl/payments/paypal/${order.id}/";
+      } else {
+        _showError('Phương thức ${order.paymentMethod} không hỗ trợ thanh toán online lại.');
+        return;
       }
 
-      if (endpoint.isNotEmpty) {
-         if (!await launchUrl(Uri.parse(endpoint), mode: LaunchMode.externalApplication)) {
-            _showError('Không thể mở trình duyệt thanh toán.');
-         }
+      print("🔗 Opening Payment URL: $endpoint");
+
+      if (await canLaunchUrl(Uri.parse(endpoint))) {
+         await launchUrl(
+           Uri.parse(endpoint), 
+           mode: LaunchMode.externalApplication // Mở trình duyệt ngoài để bank app dễ redirect
+         );
       } else {
-        _showError('Phương thức thanh toán không hỗ trợ trả lại.');
+        _showError('Không thể mở trình duyệt thanh toán.');
       }
 
     } catch (e) {
-       print("Lỗi Repay: $e");
+       print("❌ Lỗi Repay: $e");
       _showError('Lỗi kết nối: $e');
     } finally {
       isLoading.value = false;
@@ -299,49 +224,56 @@ class OrderController extends GetxController {
   }
 
   Future<void> _handleApiResponse(http.Response response) async {
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = json.decode(utf8.decode(response.bodyBytes));
-        final paymentUrl = data['payment_url'];
+      final data = json.decode(utf8.decode(response.bodyBytes));
+      final paymentUrl = data['payment_url'];
 
-        if (paymentUrl == null || paymentUrl.isEmpty) {
-             Get.to(() => SuccessScreen(
-                image: AppImages.checkoutsuccess,
-                title: 'Thành công',
-                subTitle: 'Đơn hàng COD đã tạo thành công.',
-                onPressed: () {
-                  cartController.fetchCart();
-                  // Refresh order list
-                  if (Get.isRegistered<OrderListController>()) {
-                    OrderListController.instance.fetchUserOrders();
-                  }
-                  Get.offAll(() => const NavigationMenu());
-                },
-              ));
+      // Trường hợp 1: COD hoặc thanh toán tiền mặt -> Thành công ngay
+      if (paymentUrl == null || paymentUrl.toString().isEmpty) {
+           Get.offAll(() => SuccessScreen(
+              image: AppImages.checkoutsuccess,
+              title: 'Đặt hàng thành công!',
+              subTitle: 'Đơn hàng của bạn đã được tạo. Vui lòng chuẩn bị tiền mặt khi nhận hàng.',
+              onPressed: () {
+                cartController.fetchCart();
+                // Refresh danh sách đơn hàng
+                if (Get.isRegistered<OrderListController>()) {
+                  OrderListController.instance.fetchUserOrders();
+                }
+                Get.offAll(() => const NavigationMenu());
+              },
+            ));
+      } 
+      // Trường hợp 2: Có link thanh toán (VNPAY/PayPal) -> Mở trình duyệt
+      else {
+        final uri = Uri.parse(paymentUrl);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
         } else {
-          final uri = Uri.parse(paymentUrl);
-          bool launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-          if (!launched) _showError('Không thể mở trình duyệt thanh toán.');
+          _showError('Không thể mở liên kết thanh toán.');
         }
-      } else {
-        _showError('Lỗi server: ${response.body}');
       }
   }
 
   void _showError(String message) {
-    print('❌ OrderController Error: $message');
+    Get.snackbar(
+      'Thông báo',
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: Colors.redAccent.withOpacity(0.1),
+      colorText: Colors.red,
+      duration: const Duration(seconds: 3),
+      margin: const EdgeInsets.all(10),
+    );
   }
 
-  /// Cancel order
+  /// Hủy đơn hàng
   Future<bool> cancelOrder(int orderId) async {
     isLoading.value = true;
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
 
-      if (token == null) {
-        print('❌ Cancel order: Not logged in');
-        return false;
-      }
+      if (token == null) return false;
 
       final response = await http.post(
         Uri.parse('$baseUrl/$orderId/cancel/'),
@@ -352,37 +284,34 @@ class OrderController extends GetxController {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Order cancelled successfully');
+        Get.snackbar('Thành công', 'Đã hủy đơn hàng thành công', 
+          backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green);
         
-        // Refresh order list
         if (Get.isRegistered<OrderListController>()) {
           OrderListController.instance.fetchUserOrders();
         }
         return true;
       } else {
-        final error = json.decode(response.body);
-        print('❌ Cancel order failed: ${error['error'] ?? 'Unknown error'}');
+        final error = json.decode(utf8.decode(response.bodyBytes));
+        _showError(error['error'] ?? 'Hủy đơn thất bại');
         return false;
       }
     } catch (e) {
-      print('❌ Cancel order error: $e');
+      _showError('Lỗi kết nối: $e');
       return false;
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Confirm order (Shop only)
+  /// Xác nhận đơn hàng (Dành cho Shop/Admin)
   Future<bool> confirmOrder(int orderId) async {
     isLoading.value = true;
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
 
-      if (token == null) {
-        print('❌ Confirm order: Not logged in');
-        return false;
-      }
+      if (token == null) return false;
 
       final response = await http.post(
         Uri.parse('$baseUrl/$orderId/confirm/'),
@@ -393,20 +322,20 @@ class OrderController extends GetxController {
       );
 
       if (response.statusCode == 200) {
-        print('✅ Order confirmed successfully');
+        Get.snackbar('Thành công', 'Đã xác nhận đơn hàng', 
+          backgroundColor: Colors.green.withOpacity(0.1), colorText: Colors.green);
         
-        // Refresh order list
         if (Get.isRegistered<OrderListController>()) {
           OrderListController.instance.fetchUserOrders();
         }
         return true;
       } else {
-        final error = json.decode(response.body);
-        print('❌ Confirm order failed: ${error['error'] ?? 'Unknown error'}');
+        final error = json.decode(utf8.decode(response.bodyBytes));
+        _showError(error['error'] ?? 'Xác nhận thất bại');
         return false;
       }
     } catch (e) {
-      print('❌ Confirm order error: $e');
+      _showError('Lỗi kết nối: $e');
       return false;
     } finally {
       isLoading.value = false;

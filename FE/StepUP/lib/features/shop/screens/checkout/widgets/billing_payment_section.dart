@@ -16,8 +16,8 @@ class BillingPaymentSection extends StatelessWidget {
     return Column(
       children: [
         SectionHeading(
-          title: 'Payment Method', 
-          buttonTitle: 'Change', 
+          title: 'Phương thức thanh toán', 
+          buttonTitle: 'Thay đổi', 
           onButtonPressed: () {
              // Hiển thị Modal chọn phương thức
              _showPaymentModal(context, controller);
@@ -62,11 +62,11 @@ class BillingPaymentSection extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SectionHeading(title: 'Select Payment Method', showActionButton: false),
+            const SectionHeading(title: 'Chọn phương thức thanh toán', showActionButton: false),
             const SizedBox(height: AppSizes.spaceBtwItems),
             _buildPaymentOption(context, controller, 'VNPAY', 'VNPAY E-Wallet'),
             _buildPaymentOption(context, controller, 'PAYPAL', 'PayPal'),
-            _buildPaymentOption(context, controller, 'COD', 'Cash on Delivery'),
+            _buildPaymentOption(context, controller, 'COD', 'Thanh toán khi nhận hàng'),
           ],
         ),
       ),

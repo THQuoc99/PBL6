@@ -12,19 +12,15 @@ class BillingShippingSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(ShippingController());
-    final voucherController = Get.put(VoucherController());
+    final voucherController = Get.find<VoucherController>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Phương thức vận chuyển',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
+            Text('Phương thức vận chuyển', style: Theme.of(context).textTheme.titleLarge),
             TextButton(
               onPressed: () => controller.selectShippingMethod(context),
               child: const Text('Thay đổi'),
@@ -33,136 +29,70 @@ class BillingShippingSection extends StatelessWidget {
         ),
         const SizedBox(height: AppSizes.spaceBtwItems / 2),
 
-        // Selected Shipping Method Display
         Obx(() {
-          if (controller.isLoading.value) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(AppSizes.md),
-                child: CircularProgressIndicator(),
-              ),
-            );
-          }
-
+          if (controller.isLoading.value) return const Center(child: CircularProgressIndicator());
+          
           final selectedMethod = controller.selectedShippingMethod.value;
-          final selectedVoucher = voucherController.selectedVoucher.value;
-
-          bool voucherMakesFreeShip = false;
-          if (selectedVoucher != null && selectedMethod != null) {
-            if (selectedVoucher.discountType == 'fixed') {
-              try {
-                if (selectedVoucher.discountValue >= selectedMethod.fee) voucherMakesFreeShip = true;
-              } catch (_) {}
-            }
-          }
-
           if (selectedMethod == null) {
-            return InkWell(
-              onTap: () => controller.selectShippingMethod(context),
-              child: RoundedContainer(
-                showBorder: true,
-                padding: const EdgeInsets.all(AppSizes.md),
-                borderColor: AppColors.primary,
-                bgcolor: Colors.transparent,
-                child: Row(
-                  children: [
-                    const Icon(Icons.local_shipping, color: AppColors.primary),
-                    const SizedBox(width: AppSizes.spaceBtwItems),
-                    Text(
-                      'Chọn phương thức vận chuyển',
-                      style: Theme.of(context).textTheme.bodyMedium!.apply(
-                            color: AppColors.primary,
-                            fontWeightDelta: 1,
-                          ),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.arrow_forward_ios, size: 16),
-                  ],
-                ),
-              ),
-            );
+            return const Text("Vui lòng chọn đơn vị vận chuyển", style: TextStyle(color: Colors.red));
           }
 
-          // Display selected method
+          // Check if free shipping applied
+          final isFree = voucherController.selectedShippingVoucher.value?.isFreeShipping == true;
+
           return RoundedContainer(
             showBorder: true,
             padding: const EdgeInsets.all(AppSizes.md),
             bgcolor: AppColors.primary.withOpacity(0.05),
-            borderColor: AppColors.primary,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.local_shipping_outlined,
-                        color: AppColors.primary, size: 20),
-                    const SizedBox(width: AppSizes.spaceBtwItems),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                const Icon(Icons.local_shipping_outlined, color: AppColors.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              Text(
-                                selectedMethod.name,
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              if (selectedMethod.isFreeShip || voucherMakesFreeShip) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: const Text(
-                                    'FREESHIP',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                          // [FIX]: Bọc Text trong Flexible để tự động xuống dòng hoặc cắt bớt nếu quá dài
+                          Flexible(
+                            child: Text(
+                              selectedMethod.name,
+                              style: Theme.of(context).textTheme.bodyLarge,
+                              overflow: TextOverflow.ellipsis, // Thêm dấu ... nếu chữ quá dài
+                              maxLines: 1, // Chỉ hiện trên 1 dòng
+                            ),
+                          ),
+                            if (isFree) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text(
+                                  "FREESHIP",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            selectedMethod.description,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      (selectedMethod.isFreeShip || voucherMakesFreeShip)
-                          ? 'Miễn phí'
-                          : '\$${selectedMethod.fee.toStringAsFixed(0)}',
-                      style: Theme.of(context).textTheme.titleMedium!.apply(
-                            color: (selectedMethod.isFreeShip || voucherMakesFreeShip)
-                                ? Colors.green
-                                : AppColors.primary,
-                            fontWeightDelta: 2,
-                          ),
-                    ),
-                  ],
+                              )
+                            ]
+                          ],
+                        ),
+                      Text("Giao hàng: ${selectedMethod.estimatedDays}", style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.access_time, size: 14, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Dự kiến: ${selectedMethod.estimatedDays}',
-                      style: Theme.of(context).textTheme.bodySmall!.apply(
-                            color: Colors.grey,
-                          ),
-                    ),
-                  ],
+                Text(
+                  isFree ? "Miễn phí" : "\$${selectedMethod.fee.toStringAsFixed(0)}", 
+                  style: Theme.of(context).textTheme.titleMedium?.apply(color: isFree ? Colors.green : null)
                 ),
               ],
             ),
@@ -172,4 +102,3 @@ class BillingShippingSection extends StatelessWidget {
     );
   }
 }
-

@@ -95,7 +95,7 @@ class ProductDetail extends StatelessWidget {
                         showActionButton: false,
                       ),
                       IconButton(
-                        onPressed: () => Get.to(() => const ProductReviewScreen()),
+                        onPressed: () => Get.to(() => ProductReviewScreen(productId: product.id)),
                         icon: const Icon(Iconsax.arrow_right_3, size: 18),
                       ),
                     ],

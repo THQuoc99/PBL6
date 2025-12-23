@@ -4,7 +4,6 @@ import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter_app/shop/models/order_model.dart';
 import 'package:flutter_app/shop/controllers/order_controller.dart';
 import 'package:flutter_app/features/shop/screens/return/create_return_screen.dart';
-import 'package:flutter_app/features/shop/screens/return/return_list_screen.dart';
 import 'package:flutter_app/constants/colors.dart';
 
 class OrderDetailScreen extends StatelessWidget {
@@ -462,25 +461,49 @@ class OrderDetailScreen extends StatelessWidget {
 
   // 5. Widget Tổng tiền đơn hàng
   Widget _buildTotalSection(BuildContext context) {
-    // Calculate subtotal (total - shipping fee)
-    double subtotal = order.totalAmount - order.shippingFee;
+    // 1. Tính tổng tiền hàng (Merchandise Subtotal) - Đã trừ Voucher Shop
+    double merchandiseSubtotal = order.subOrders.fold(0, (sum, item) => sum + item.subTotal);
+
+    // 2. Lấy giảm giá Sàn (Platform Discount)
+    double platformDiscount = order.discountAmount;
+
     return Card(
-      elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 2, 
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _detailRow("Tạm tính", "\$${subtotal.toStringAsFixed(0)}"),
+            _detailRow("Tổng tiền hàng", "\$${merchandiseSubtotal.toStringAsFixed(0)}"),
             const SizedBox(height: 8),
-            _detailRow("Phí vận chuyển", "\$${order.shippingFee.toStringAsFixed(0)}"), 
+            
+            _detailRow("Phí vận chuyển", "\$${order.shippingFee.toStringAsFixed(0)}"),
+            
+            // Chỉ hiện dòng giảm giá nếu có (>0)
+            if (platformDiscount > 0) ...[
+              const SizedBox(height: 8),
+              _detailRow(
+                "Voucher giảm giá", 
+                "-\$${platformDiscount.toStringAsFixed(0)}", 
+                color: Colors.red
+              ), 
+            ],
+
             const Divider(height: 24),
-            _detailRow("Tổng cộng", "\$${order.totalAmount.toStringAsFixed(0)}", isBold: true, fontSize: 18, color: AppColors.primary),
+            
+            // Thành tiền cuối cùng
+            _detailRow(
+              "Thành tiền", 
+              "\$${order.totalAmount.toStringAsFixed(0)}", 
+              isBold: true, 
+              fontSize: 18, 
+              color: AppColors.primary
+            ),
           ],
         ),
       ),
     );
   }
-
   // Helpers
   Widget _sectionHeader(IconData icon, String title) {
     return Row(children: [Icon(icon, size: 18, color: AppColors.primary), const SizedBox(width: 8), Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))]);

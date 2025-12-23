@@ -25,7 +25,7 @@ class Body extends StatelessWidget {
                     height: size.height * 0.2,
                   ),
                   const Text(
-                    "StepUP",
+                    "SHOEX",
                     style: TextStyle(
                       fontWeight: FontWeight.bold, 
                       fontSize: 22,

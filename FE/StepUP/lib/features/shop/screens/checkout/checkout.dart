@@ -5,28 +5,60 @@ import 'package:flutter_app/constants/colors.dart';
 import 'package:flutter_app/utils/helpers/helper_function.dart';
 import 'package:flutter_app/widgets/appbar/appbar.dart';
 import 'package:flutter_app/widgets/containers/rounded_container.dart';
-import 'package:flutter_app/common/widgets/products/cart/coupon_code_field.dart';
 import 'package:flutter_app/features/shop/screens/checkout/widgets/billing_address_section.dart';
 import 'package:flutter_app/features/shop/screens/checkout/widgets/billing_amount_section.dart';
 import 'package:flutter_app/features/shop/screens/checkout/widgets/billing_shipping_section.dart';
 import 'widgets/billing_payment_section.dart';
 import 'package:flutter_app/shop/controllers/cart_controller.dart';
 import 'package:flutter_app/shop/controllers/order_controller.dart';
-import 'package:flutter_app/shop/controllers/address_controller.dart';
-import 'package:flutter_app/shop/controllers/shipping_controller.dart';
 import 'package:flutter_app/shop/controllers/voucher_controller.dart';
 import 'package:flutter_app/screens/home/components/section_heading.dart';
+import 'package:flutter_app/shop/models/voucher_model.dart';
+import 'package:flutter_app/shop/models/cart_item_model.dart'; // Đảm bảo import model này
 
-class CheckoutScreen extends StatelessWidget {
+class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
+
+  @override
+  State<CheckoutScreen> createState() => _CheckoutScreenState();
+}
+
+class _CheckoutScreenState extends State<CheckoutScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchVouchers();
+    });
+  }
+
+  void _fetchVouchers() {
+    final cartController = Get.find<CartController>();
+    final voucherController = Get.put(VoucherController());
+
+    // [FIX] Lấy storeId dạng String
+    final storeIds = cartController.selectedItems
+        .map((e) => e.storeId?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+    
+    final totalAmount = cartController.totalAmount.value; 
+
+    print("🛒 CHECKOUT INIT: Stores=$storeIds Total=$totalAmount");
+
+    voucherController.fetchAvailableVouchers(
+      storeIds: storeIds, 
+      totalOrderAmount: totalAmount
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final dark = HelperFunction.isDarkMode(context);
-    final cartController = Get.put(CartController()); 
-    Get.put(AddressController());
+    final cartController = Get.find<CartController>(); 
     final orderController = Get.put(OrderController());
-    final shippingController = Get.put(ShippingController());
+    final voucherController = Get.put(VoucherController());
 
     return Scaffold(
       appBar: CusAppbar(
@@ -38,17 +70,12 @@ class CheckoutScreen extends StatelessWidget {
           padding: const EdgeInsets.all(AppSizes.defaultSpace),
           child: Column(
             children: [
-              // 1. List Items by Shop
               Obx(() => _buildItemsByShop(context, cartController, dark)),
               const SizedBox(height: AppSizes.spaceBtwSections),
 
-              // 2. Coupon
-              const CouponCode(),
+              _buildVoucherSelector(context, dark, voucherController),
               const SizedBox(height: AppSizes.spaceBtwSections),
 
-              const SizedBox(height: AppSizes.spaceBtwSections),
-
-              // 3. Billing Info
               RoundedContainer(
                 showBorder: true,
                 bgcolor: dark ? AppColors.dark : AppColors.light,
@@ -60,87 +87,27 @@ class CheckoutScreen extends StatelessWidget {
                     const Divider(),
                     const SizedBox(height: AppSizes.spaceBtwItems),
 
-                    // Voucher selector placed above payment methods
-                    Builder(builder: (ctx) {
-                      final voucherController = Get.put(VoucherController());
-                      return Obx(() {
-                        final selPlatform = voucherController.selectedVoucher.value;
-                        final selShipping = voucherController.selectedShipping.value;
-                        final selStores = voucherController.selectedStoreVouchers;
-                        final codes = <String>[];
-                        if (selPlatform != null) codes.add('Nền tảng:${selPlatform.code}');
-                        if (selShipping != null) codes.add('Vận chuyển:${selShipping.code}');
-                        if (selStores.isNotEmpty) codes.addAll(selStores.values.map((v) => 'Shop:${v.code}'));
-                        final hasSelection = codes.isNotEmpty;
-                        final title = hasSelection ? 'Voucher đã chọn (${codes.length})' : 'Chọn voucher';
-                        final subtitle = hasSelection ? codes.join(' • ') : '';
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SectionHeading(
-                              title: 'Voucher',
-                              buttonTitle: 'Thay đổi',
-                              onButtonPressed: () => _showVoucherPicker(ctx),
-                            ),
-                            const SizedBox(height: AppSizes.spaceBtwItems / 2),
-                            RoundedContainer(
-                              showBorder: true,
-                              padding: const EdgeInsets.all(AppSizes.md),
-                              bgcolor: dark ? AppColors.dark : AppColors.light,
-                              child: ListTile(
-                                onTap: () => _showVoucherPicker(ctx),
-                                title: Text(title),
-                                subtitle: subtitle.isNotEmpty ? Text(subtitle) : null,
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (hasSelection)
-                                      IconButton(
-                                        icon: const Icon(Icons.clear, size: 20),
-                                        onPressed: () {
-                                          voucherController.clearAllSelections();
-                                        },
-                                      ),
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.arrow_forward_ios, size: 16),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      });
-                    }),
-                    const SizedBox(height: AppSizes.spaceBtwItems),
-                    const Divider(),
-                    const SizedBox(height: AppSizes.spaceBtwItems),
-
                     const BillingPaymentSection(), 
-                    
                     const SizedBox(height: AppSizes.spaceBtwItems),
                     const Divider(),
                     const SizedBox(height: AppSizes.spaceBtwItems),
                     
-                    // Shipping Section
                     const BillingShippingSection(),
-                    
                     const SizedBox(height: AppSizes.spaceBtwItems),
                     const Divider(),
                     const SizedBox(height: AppSizes.spaceBtwItems),
                     
                     const BillingAddressSection(),
-                    
                     const SizedBox(height: AppSizes.spaceBtwItems),
                     const Divider(),
                     const SizedBox(height: AppSizes.spaceBtwItems),
                     
-                    // Order Note
                     TextField(
                       controller: orderController.noteController,
                       maxLines: 3,
                       decoration: const InputDecoration(
-                        labelText: 'Ghi chú đơn hàng',
-                        hintText: 'Nhập ghi chú cho shop (tùy chọn)',
+                        labelText: 'Ghi chú',
+                        hintText: 'Lời nhắn cho người bán...',
                         border: OutlineInputBorder(),
                         alignLabelWithHint: true,
                       ),
@@ -153,175 +120,229 @@ class CheckoutScreen extends StatelessWidget {
         ),
       ),
 
-      // 4. Checkout Button
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(AppSizes.defaultSpace),
         child: Obx(() {
-            final subTotal = cartController.totalAmount.value;
-            final voucherController = Get.put(VoucherController());
-            final selectedPlatform = voucherController.selectedVoucher.value;
-            final selectedShipping = voucherController.selectedShipping.value;
-            final selectedStores = voucherController.selectedStoreVouchers;
-
-            // compute per-store subtotals
-            final Map<String, double> storeSubtotals = {};
-            for (var item in cartController.selectedItems) {
-              final sid = item.storeId ?? 'unknown';
-              storeSubtotals[sid] = (storeSubtotals[sid] ?? 0) + item.subTotal;
-            }
-
-            // compute store-level discounts
-            double storeDiscountTotal = 0.0;
-            for (final entry in storeSubtotals.entries) {
-              final sid = entry.key;
-              final subtotal = entry.value;
-              final v = selectedStores[sid];
-              if (v != null) {
-                double d = 0.0;
-                if (v.discountType == 'fixed') {
-                  d = v.discountValue;
-                  if (d > subtotal) d = subtotal;
-                } else {
-                  d = subtotal * (v.discountValue / 100.0);
-                  if (v.maxDiscount != null) d = d > v.maxDiscount! ? v.maxDiscount! : d;
-                }
-                storeDiscountTotal += d;
-              }
-            }
-
-            // apply platform voucher on remaining subtotal
-            double platformDiscount = 0.0;
-            final remaining = subTotal - storeDiscountTotal;
-            if (selectedPlatform != null) {
-              if (selectedPlatform.discountType == 'fixed') {
-                platformDiscount = selectedPlatform.discountValue;
-                if (platformDiscount > remaining) platformDiscount = remaining;
-              } else {
-                platformDiscount = remaining * (selectedPlatform.discountValue / 100.0);
-                if (selectedPlatform.maxDiscount != null) platformDiscount = platformDiscount > selectedPlatform.maxDiscount! ? selectedPlatform.maxDiscount! : platformDiscount;
-              }
-            }
-
-            // shipping adjustments from selected shipping voucher
-            double shippingFeeToShow = shippingController.shippingFee;
-            if (selectedShipping != null) {
-              if (selectedShipping.isFreeShipping) {
-                shippingFeeToShow = 0.0;
-              } else if (selectedShipping.discountType == 'fixed') {
-                shippingFeeToShow = (shippingFeeToShow - selectedShipping.discountValue).clamp(0.0, double.infinity);
-              } else if (selectedShipping.discountType == 'percent') {
-                shippingFeeToShow = shippingFeeToShow - (shippingFeeToShow * (selectedShipping.discountValue / 100.0));
-              }
-            }
-
-            // platform fixed voucher can also cover shipping
-            if (selectedPlatform != null && selectedPlatform.discountType == 'fixed') {
-              if (selectedPlatform.discountValue >= shippingFeeToShow) shippingFeeToShow = 0.0;
-            }
-
-            final total = subTotal - (storeDiscountTotal + platformDiscount) + shippingFeeToShow;
-
-          return ElevatedButton(
-            // Gọi hàm processOrder khi nhấn
-            onPressed: orderController.isLoading.value 
-                ? null 
-                : () => orderController.processOrder(),
-            child: orderController.isLoading.value
-                ? const SizedBox(
-                    width: 20, 
-                    height: 20, 
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
-                  )
-                : Text('Thanh toán \$${total.toStringAsFixed(0)}'),
-          );
+            return ElevatedButton(
+              onPressed: orderController.isLoading.value 
+                  ? null 
+                  : () => orderController.processOrder(),
+              child: orderController.isLoading.value
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Đặt hàng'),
+            );
         }),
       ),
     );
   }
 
+  Widget _buildVoucherSelector(BuildContext context, bool dark, VoucherController controller) {
+    return Obx(() {
+      final selPlatform = controller.selectedPlatformVoucher.value;
+      final selShipping = controller.selectedShippingVoucher.value;
+      final selStores = controller.selectedStoreVouchers;
+
+      int count = 0;
+      if (selPlatform != null) count++;
+      if (selShipping != null) count++;
+      count += selStores.length;
+
+      String subtitle = count > 0 ? "Đã chọn $count voucher" : "Chọn hoặc nhập mã";
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeading(
+            title: 'Shoex Voucher',
+            buttonTitle: 'Chọn Mã',
+            onButtonPressed: () => _showVoucherPicker(context),
+          ),
+          const SizedBox(height: AppSizes.spaceBtwItems / 2),
+          
+          InkWell(
+            onTap: () => _showVoucherPicker(context),
+            child: RoundedContainer(
+              showBorder: true,
+              padding: const EdgeInsets.all(AppSizes.md),
+              bgcolor: dark ? AppColors.dark : AppColors.light,
+              child: Row(
+                children: [
+                  const Icon(Icons.confirmation_number_outlined, color: AppColors.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
+                        if (selPlatform != null) 
+                          Text("Sàn: ${selPlatform.code}", style: const TextStyle(fontSize: 12, color: Colors.green)),
+                        if (selShipping != null)
+                          Text("Ship: ${selShipping.code}", style: const TextStyle(fontSize: 12, color: Colors.blue)),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios, size: 14),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    });
+  }
+
   void _showVoucherPicker(BuildContext context) {
-    final voucherController = Get.put(VoucherController());
+    final controller = Get.find<VoucherController>();
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+        return DefaultTabController(
+          length: 3,
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text("Chọn Shoex Voucher"),
+              leading: IconButton(onPressed: () => Get.back(), icon: const Icon(Icons.close)),
+              bottom: const TabBar(
+                tabs: [
+                  Tab(text: "Shop"),
+                  Tab(text: "Sàn"),
+                  Tab(text: "Vận chuyển"),
+                ],
+              ),
+            ),
+            body: TabBarView(
               children: [
-                const SizedBox(height: 8),
-                Text('Chọn voucher', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                // My Wallet
+                // [FIX UI 1] Bọc Obx trực tiếp vào từng tab để nó lắng nghe chính xác
                 Obx(() {
-                  final my = voucherController.myVouchers;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Ví của tôi', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      if (my.isEmpty) const Text('Bạn chưa lưu voucher nào'),
-                      ...my.map((v) => ListTile(
-                        title: Text(v.title.isNotEmpty ? v.title : v.code),
-                        subtitle: Text('${v.code} • Hết hạn: ${v.endDate}'),
-                        onTap: () {
-                          // If voucher is explicitly a shipping-type voucher, treat as shipping.
-                          if (v.type == 'shipping') {
-                            voucherController.selectShippingVoucher(v);
-                          } else {
-                            // For platform/store vouchers that also have free-shipping flag,
-                            // select them as platform/store AND also set selectedShipping so UI shows freeship effect.
-                            voucherController.selectVoucher(v);
-                            if (v.isFreeShipping) voucherController.selectedShipping.value = v;
-                          }
-                          Navigator.of(ctx).pop();
-                        },
-                      ))
-                    ],
-                  );
+                  // Mẹo: Truy cập biến length hoặc value để GetX biết cần lắng nghe thay đổi
+                  final _ = controller.selectedStoreVouchers.length; 
+                  return _buildVoucherList(controller.availableStoreVouchers, controller, "Không có voucher Shop phù hợp", isStore: true);
                 }),
-                const Divider(),
-                // All vouchers
+
                 Obx(() {
-                  final all = voucherController.vouchers;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Tất cả', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      if (all.isEmpty) const Text('Không có voucher nào'),
-                      ...all.map((v) => ListTile(
-                        title: Text(v.title.isNotEmpty ? v.title : v.code),
-                        subtitle: Text('${v.code} • Hết hạn: ${v.endDate}'),
-                        onTap: () {
-                          if (v.type == 'shipping') {
-                            voucherController.selectShippingVoucher(v);
-                          } else {
-                            voucherController.selectVoucher(v);
-                            if (v.isFreeShipping) voucherController.selectedShipping.value = v;
-                          }
-                          Navigator.of(ctx).pop();
-                        },
-                      ))
-                    ],
-                  );
+                  final _ = controller.selectedPlatformVoucher.value;
+                  return _buildVoucherList(controller.availablePlatformVouchers, controller, "Không có voucher Sàn phù hợp", isPlatform: true);
                 }),
-                const SizedBox(height: 12),
+
+                Obx(() {
+                  final _ = controller.selectedShippingVoucher.value;
+                  return _buildVoucherList(controller.availableShippingVouchers, controller, "Không có voucher Ship phù hợp", isShipping: true);
+                }),
               ],
+            ),
+            bottomNavigationBar: Padding(
+              padding: const EdgeInsets.all(16),
+              child: ElevatedButton(
+                onPressed: () => Get.back(),
+                child: const Text("Đồng ý"),
+              ),
             ),
           ),
         );
-      }
+      },
     );
   }
 
-  // Build items grouped by shop
-  Widget _buildItemsByShop(BuildContext context, CartController cartController, bool dark) {
-    // Group selected items by store
-    final itemsByStore = <String, List>{};
+  Widget _buildVoucherList(List<VoucherModel> list, VoucherController controller, String emptyText, {bool isStore=false, bool isPlatform=false, bool isShipping=false}) {
+    if (list.isEmpty) return Center(child: Text(emptyText));
     
+    return ListView.builder(
+      padding: const EdgeInsets.all(12),
+      itemCount: list.length,
+      itemBuilder: (_, i) => _buildVoucherItem(list[i], controller, isStore: isStore, isPlatform: isPlatform, isShipping: isShipping),
+    );
+  }
+
+  Widget _buildVoucherItem(VoucherModel v, VoucherController controller, {bool isStore=false, bool isPlatform=false, bool isShipping=false}) {
+    bool isSelected = false;
+    
+    if (isStore) {
+      String vStoreId = v.storeId?.toString() ?? '';
+      if (controller.selectedStoreVouchers.containsKey(vStoreId)) {
+         isSelected = controller.selectedStoreVouchers[vStoreId]?.code == v.code;
+      }
+    } else if (isPlatform) {
+      isSelected = controller.selectedPlatformVoucher.value?.code == v.code;
+    } else if (isShipping) {
+      isSelected = controller.selectedShippingVoucher.value?.code == v.code;
+    }
+
+    return Card(
+      color: v.isUsable ? Colors.white : Colors.grey[200],
+      margin: const EdgeInsets.only(bottom: 12),
+      child: CheckboxListTile(
+        title: Text(v.code, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(v.discountString, style: const TextStyle(color: Colors.red)),
+            if (!v.isUsable) 
+              Text(v.reason ?? "Chưa đủ điều kiện", style: const TextStyle(color: Colors.grey, fontSize: 11)),
+            if (v.minOrderAmount > 0) 
+              Text("Đơn tối thiểu: ${v.minOrderAmount.toStringAsFixed(0)}", style: const TextStyle(fontSize: 11)),
+            if (v.storeName != null)
+              Text("Shop: ${v.storeName}", style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic)),
+          ],
+        ),
+        value: isSelected,
+        enabled: v.isUsable || isSelected, 
+        onChanged: (val) {
+          if (!v.isUsable && !isSelected) return;
+
+          if (isStore) {
+            if (v.storeId != null) {
+               controller.selectStoreVoucher(v.storeId.toString(), val == true ? v : null);
+            }
+          } else if (isPlatform) {
+            controller.selectPlatformVoucher(val == true ? v : null);
+          } else if (isShipping) {
+            controller.selectShippingVoucher(val == true ? v : null);
+          }
+        },
+      ),
+    );
+  }
+
+  // --- [FIX UI 2] Hàm xử lý URL ảnh sản phẩm sạch sẽ hơn ---
+  Widget _getProductImage(CartItemModel item) {
+    String imageUrl = item.image ?? '';
+    
+    // Logic fallback nếu ảnh trống
+    if (imageUrl.isEmpty && item.productId != null) {
+      // Giả sử backend host ở 10.0.2.2:8000
+      imageUrl = "/media/products/${item.productId}/${item.productId}_0.jpg";
+    }
+
+    // Nếu đường dẫn là tương đối, thêm domain
+    if (!imageUrl.startsWith('http')) {
+      // Xử lý dấu gạch chéo kép nếu có
+      if (imageUrl.startsWith('/')) {
+        imageUrl = 'http://10.0.2.2:8000$imageUrl';
+      } else {
+        imageUrl = 'http://10.0.2.2:8000/$imageUrl';
+      }
+    }
+
+    // Xử lý trường hợp null hoặc rỗng lần cuối
+    if (imageUrl.isEmpty || imageUrl == 'http://10.0.2.2:8000/') {
+       return const Icon(Icons.image, color: Colors.grey);
+    }
+
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        // Nếu load ảnh lỗi (404), hiện icon thay thế
+        return const Icon(Icons.broken_image, color: Colors.grey);
+      },
+    );
+  }
+
+  Widget _buildItemsByShop(BuildContext context, CartController cartController, bool dark) {
+    final itemsByStore = <String, List>{};
     for (var item in cartController.selectedItems) {
       final storeName = item.storeName ?? 'Unknown Shop';
       if (!itemsByStore.containsKey(storeName)) {
@@ -330,11 +351,12 @@ class CheckoutScreen extends StatelessWidget {
       itemsByStore[storeName]!.add(item);
     }
 
+    if (itemsByStore.isEmpty) return const SizedBox();
+
     return Column(
       children: itemsByStore.entries.map((entry) {
         final storeName = entry.key;
         final items = entry.value;
-        
         return Container(
           margin: const EdgeInsets.only(bottom: AppSizes.spaceBtwItems),
           decoration: BoxDecoration(
@@ -345,7 +367,6 @@ class CheckoutScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Shop Header
               Container(
                 padding: const EdgeInsets.all(AppSizes.md),
                 decoration: BoxDecoration(
@@ -357,103 +378,38 @@ class CheckoutScreen extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.store, size: 20),
+                    const Icon(Icons.store, size: 18),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        storeName,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                    Text(storeName, style: Theme.of(context).textTheme.titleSmall),
                   ],
                 ),
               ),
-              
-              // Items in this shop
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(AppSizes.md),
-                separatorBuilder: (_, __) => const Divider(height: 20),
+                separatorBuilder: (_, __) => const Divider(),
                 itemCount: items.length,
                 itemBuilder: (_, index) {
                   final item = items[index];
-                  
                   return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Product Image
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: dark ? AppColors.darkGrey : AppColors.light,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Builder(builder: (context) {
-                          String imageUrl = item.image ?? '';
-                          if (imageUrl.startsWith('/media')) {
-                            imageUrl = 'http://10.0.2.2:8000$imageUrl';
-                          }
-
-                          if (imageUrl.isNotEmpty) {
-                            return ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.network(
-                                imageUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(Icons.image, color: Colors.grey);
-                                },
-                                loadingBuilder: (context, child, loadingProgress) {
-                                  if (loadingProgress == null) return child;
-                                  return const Center(
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  );
-                                },
-                              ),
-                            );
-                          }
-
-                          return const Icon(Icons.image, color: Colors.grey);
-                        }),
+                      RoundedContainer(
+                        width: 50, height: 50,
+                        padding: EdgeInsets.zero,
+                        // Gọi hàm xử lý ảnh mới
+                        child: _getProductImage(item),
                       ),
-                      const SizedBox(width: 12),
-                      
-                      // Product Info
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              item.productName,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(height: 4),
-                            // Attributes (Size/Color)
-                            if (item.selectedVariation.isNotEmpty)
-                              Text(
-                                item.selectedVariation.values.join(' - '),
-                                style: const TextStyle(color: Colors.grey, fontSize: 12),
-                              ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "x${item.quantity}",
-                              style: const TextStyle(color: Colors.black),
-                            ),
+                            Text(item.productName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text("x${item.quantity}   \$${item.price.toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.bold)),
                           ],
                         ),
-                      ),
-                      
-                      // Price
-                      Text(
-                        "\$${(item.quantity * item.price).toStringAsFixed(0)}",
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                      )
                     ],
                   );
                 },

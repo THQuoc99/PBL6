@@ -73,7 +73,6 @@ class UserController extends GetxController {
   Future<void> updateSomeData(Map<String, dynamic> updatedData) async {
     final SharedPreferences prefs = await _prefs;
 
-    // Cập nhật từng trường nếu nó tồn tại trong phản hồi
     if (updatedData['full_name'] != null) {
       String nameToSave = updatedData['full_name'];
       await prefs.setString('fullName', nameToSave);
@@ -89,11 +88,18 @@ class UserController extends GetxController {
       await prefs.setString('phone', phoneToSave);
       phone.value = phoneToSave;
     }
-    
+
     if (updatedData['birth_date'] != null) {
       String birthDateToSave = updatedData['birth_date'];
       await prefs.setString('birthDate', birthDateToSave);
       birthDate.value = birthDateToSave;
+    }
+
+    // MỚI: cập nhật avatar nếu backend trả về
+    if (updatedData['avatar'] != null) {
+      String avatarToSave = updatedData['avatar'];
+      await prefs.setString('avatar', avatarToSave);
+      avatar.value = avatarToSave;
     }
   }
 }

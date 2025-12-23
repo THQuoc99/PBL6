@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/features/shop/screens/cart/cart.dart';
 import 'package:flutter_app/screens/chatbox/chatbox.dart';
 import 'package:flutter_app/screens/notification/notification_screen.dart';
 import 'package:flutter_app/shop/controllers/notification_controller.dart';

@@ -46,33 +46,80 @@ class ReviewSerializer(serializers.ModelSerializer):
         return False
 
 class CreateReviewSerializer(serializers.ModelSerializer):
-    # Dùng để upload ảnh/video (nếu dùng Multipart/Form-data)
-    uploaded_images = serializers.ListField(
-        child=serializers.ImageField(allow_empty_file=False, use_url=False),
-        write_only=True, required=False
+    product_id = serializers.IntegerField(write_only=True, required=False)
+    variant_id = serializers.IntegerField(write_only=True, required=False)
+    order_item = serializers.PrimaryKeyRelatedField(
+        queryset=OrderItem.objects.all(),
+        write_only=True,
+        required=False,
+        allow_null=True
     )
-    
+
     class Meta:
         model = Review
         fields = [
-            'order_item', 'rating', 'comment', 
+            'order_item', 'product_id', 'variant_id', 'rating', 'comment',
             'size_accuracy', 'color_accuracy', 'material_quality',
-            'uploaded_images'
         ]
 
-    def validate_order_item(self, value):
-        # Kiểm tra xem người dùng hiện tại có phải là chủ đơn hàng không
-        user = self.context['request'].user
-        if value.order.buyer != user:
-            raise serializers.ValidationError("Bạn không có quyền đánh giá đơn hàng này.")
-        return value
+    def validate(self, attrs):
+        request = self.context['request']
+        user = request.user
+
+        order_item = attrs.get('order_item')
+        product_id = attrs.get('product_id')
+        variant_id = attrs.get('variant_id')
+
+        if order_item is None and product_id is None:
+            raise serializers.ValidationError("Phải cung cấp 'order_item' hoặc 'product_id'.")
+
+        # If order_item provided: verify ownership
+        if order_item is not None:
+            if order_item.order.buyer != user:
+                raise serializers.ValidationError("Bạn không có quyền đánh giá đơn hàng này.")
+            return attrs
+
+        # product_id provided: ensure int
+        try:
+            product_id_int = int(product_id)
+        except Exception:
+            raise serializers.ValidationError("product_id không hợp lệ.")
+
+        qs = OrderItem.objects.filter(
+            order__buyer=user,
+            order__status='completed',
+            variant__product_id=product_id_int
+        ).order_by('-order__created_at')
+
+        # If variant_id provided, narrow down to that variant
+        if variant_id is not None:
+            try:
+                variant_id_int = int(variant_id)
+                qs = qs.filter(variant__variant_id=variant_id_int)
+            except Exception:
+                raise serializers.ValidationError("variant_id không hợp lệ.")
+
+        candidate = qs.first()
+
+        if not candidate:
+            raise serializers.ValidationError("Không tìm thấy sản phẩm đã mua phù hợp để đánh giá.")
+
+        attrs['order_item'] = candidate
+        attrs.pop('product_id', None)
+        attrs.pop('variant_id', None)
+        return attrs
 
     def create(self, validated_data):
-        images_data = validated_data.pop('uploaded_images', [])
+        request = self.context.get('request')
+        # Extract files from request.FILES (works for multipart uploads where files are named 'uploaded_images')
+        files = []
+        if request is not None:
+            files = request.FILES.getlist('uploaded_images')
+
         review = Review.objects.create(**validated_data)
-        
-        # Lưu ảnh
-        for img in images_data:
-            ReviewImage.objects.create(review=review, image=img)
-            
+
+        # Save uploaded images (if any)
+        for f in files:
+            ReviewImage.objects.create(review=review, image=f)
+
         return review

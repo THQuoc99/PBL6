@@ -9,13 +9,14 @@ class VoucherScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Đảm bảo controller được put
     final controller = Get.put(VoucherController());
 
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Voucher & Ưu đãi'),
+          title: const Text('Kho Voucher'),
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Tất cả'),
@@ -36,9 +37,11 @@ class VoucherScreen extends StatelessWidget {
               Expanded(
                 child: TabBarView(
                   children: [
-                    // Tab 1: All vouchers (available to save)
+                    // Tab 1: All available vouchers from API (fetchVouchers)
                     Obx(() {
-                      final list = controller.vouchers;
+                      // Note: In VoucherController, make sure 'vouchers' list is populated by fetchVouchers() 
+                      // which calls GET /api/discounts/ (public list)
+                      final list = controller.allVouchers; 
                       if (list.isEmpty) {
                         return const Center(child: Text('Không có voucher nào hiện tại'));
                       }
@@ -46,19 +49,39 @@ class VoucherScreen extends StatelessWidget {
                         itemCount: list.length,
                         itemBuilder: (context, index) {
                           final VoucherModel v = list[index];
-                          final saved = controller.myVouchers.any((m) => m.code == v.code);
+                          // Check if saved in 'myVouchers' list
+                          final isSaved = controller.myWalletVouchers.any((m) => m.code == v.code);
+                          
                           return Card(
+                            margin: const EdgeInsets.only(bottom: 10),
                             child: ListTile(
-                              title: Text(v.title.isNotEmpty ? v.title : v.code),
-                              subtitle: Text('${v.code} • Hết hạn: ${v.endDate}'),
+                              leading: const Icon(Icons.confirmation_number_outlined, color: Colors.blue),
+                              title: Text(v.code, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(v.discountString), // e.g. "-10%" or "-50k"
+                                  Text('Hết hạn: ${v.endDate}', style: const TextStyle(fontSize: 12)),
+                                  if (v.minOrderAmount > 0)
+                                    Text('Đơn tối thiểu: ${v.minOrderAmount.toStringAsFixed(0)}đ', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                ],
+                              ),
                               trailing: ElevatedButton(
-                                onPressed: saved
+                                onPressed: isSaved
                                     ? null
                                     : () async {
                                         final ok = await controller.saveVoucher(v.code);
-                                        Get.snackbar('Voucher', ok ? 'Lưu voucher thành công' : 'Không thể lưu voucher');
+                                        Get.snackbar(
+                                          'Thông báo', 
+                                          ok ? 'Lưu voucher thành công' : 'Không thể lưu voucher',
+                                          snackPosition: SnackPosition.BOTTOM
+                                        );
                                       },
-                                child: Text(saved ? 'Đã lưu' : 'Lưu'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isSaved ? Colors.grey : Colors.blue,
+                                  foregroundColor: Colors.white
+                                ),
+                                child: Text(isSaved ? 'Đã lưu' : 'Lưu'),
                               ),
                             ),
                           );
@@ -66,9 +89,9 @@ class VoucherScreen extends StatelessWidget {
                       );
                     }),
 
-                    // Tab 2: My wallet
+                    // Tab 2: My Wallet (Saved Vouchers)
                     Obx(() {
-                      final list = controller.myVouchers;
+                      final list = controller.myWalletVouchers; // populated by fetchMyWallet()
                       if (list.isEmpty) {
                         return const Center(child: Text('Bạn chưa lưu voucher nào'));
                       }
@@ -77,31 +100,23 @@ class VoucherScreen extends StatelessWidget {
                         itemBuilder: (context, index) {
                           final VoucherModel v = list[index];
                           return Card(
+                            margin: const EdgeInsets.only(bottom: 10),
                             child: ListTile(
-                              title: Text(v.title.isNotEmpty ? v.title : v.code),
-                              subtitle: Text('${v.code} • Hết hạn: ${v.endDate}'),
+                              leading: const Icon(Icons.account_balance_wallet_outlined, color: Colors.green),
+                              title: Text(v.code, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(v.discountString),
+                                  Text('Hết hạn: ${v.endDate}', style: const TextStyle(fontSize: 12)),
+                                ],
+                              ),
                               trailing: ElevatedButton(
-                                onPressed: () async {
-                                  // Assign voucher type: shipping vs platform vs store
-                                  if (v.isFreeShipping) {
-                                    controller.selectShippingVoucher(v);
-                                  } else if (v.type == 'platform') {
-                                    controller.selectVoucher(v);
-                                  } else if (v.type == 'store') {
-                                    // assign to applicable stores if provided
-                                    if (v.applicableStores != null && v.applicableStores!.isNotEmpty) {
-                                      for (final s in v.applicableStores!) {
-                                        controller.setStoreVoucher('$s', v);
-                                      }
-                                    } else {
-                                      // fallback: treat as platform/store-agnostic
-                                      controller.selectVoucher(v);
-                                    }
-                                  }
-                                  // Navigate to cart screen to use the voucher
+                                onPressed: () {
+                                  // Chuyển sang giỏ hàng để dùng ngay
                                   Get.to(() => const CartScreen());
                                 },
-                                child: const Text('Dùng'),
+                                child: const Text('Dùng ngay'),
                               ),
                             ),
                           );

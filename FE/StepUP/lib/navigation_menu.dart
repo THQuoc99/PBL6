@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/features/shop/screens/cart/cart.dart';
 import 'package:flutter_app/features/shop/screens/order/order.dart';
 import 'package:flutter_app/screens/account/setting/setting.dart';
 import 'package:flutter_app/screens/favorite/favorite.dart';

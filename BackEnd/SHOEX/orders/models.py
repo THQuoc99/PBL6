@@ -47,6 +47,13 @@ class Order(models.Model):
         verbose_name="Trạng thái thanh toán"
     )
     
+    discount_amount = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=0, 
+        verbose_name="Tổng giảm giá sàn"
+    )
+    
     shipping_fee = models.DecimalField(
         max_digits=10, 
         decimal_places=2, 
@@ -83,11 +90,23 @@ class SubOrder(models.Model):
         verbose_name="Cửa hàng"
     )
     
+    platform_discount = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=0, 
+        verbose_name="Giảm giá sàn phân bổ"
+    )
     # DB datanew dùng cột 'subtotal' thay vì 'total_amount' cho suborder
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="Thành tiền")
     
     status = models.CharField(max_length=20, choices=Order.STATUS_CHOICES, default='pending')
     
+    platform_discount = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=0, 
+        verbose_name="Giảm giá sàn phân bổ"
+    )
     # Thông tin vận chuyển
     tracking_number = models.CharField(max_length=100, null=True, blank=True)
     shipped_at = models.DateTimeField(null=True, blank=True)

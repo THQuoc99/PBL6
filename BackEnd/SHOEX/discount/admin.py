@@ -16,15 +16,24 @@ class VoucherStoreInline(admin.TabularInline):
 
 @admin.register(Voucher)
 class VoucherAdmin(admin.ModelAdmin):
-    list_display = ['code', 'type', 'seller', 'discount_value', 'start_date', 'end_date', 'is_active']
-    list_filter = ['type', 'is_active', 'start_date', 'end_date']
-    search_fields = ['code', 'seller__name'] # Search theo tên Store
-    raw_id_fields = ['seller'] # Để chọn Store dễ dàng hơn
+    # Cập nhật tên trường: type -> scope, seller -> store
+    list_display = ['code', 'scope', 'store', 'discount_value', 'start_date', 'end_date', 'is_active']
+    
+    # list_filter phải dùng field thật trong DB (scope), không dùng property (type)
+    list_filter = ['scope', 'is_active', 'start_date', 'end_date']
+    
+    # Search theo store__name thay vì seller__name
+    search_fields = ['code', 'store__name'] 
+    
+    # Dùng store thay vì seller
+    raw_id_fields = ['store'] 
+    
     inlines = [VoucherProductInline, VoucherStoreInline]
     
     fieldsets = (
         ('Thông tin chung', {
-            'fields': ('code', 'type', 'seller', 'is_active', 'is_auto')
+            # Thay is_auto bằng is_free_shipping (vì model mới không có is_auto)
+            'fields': ('code', 'scope', 'store', 'is_active', 'is_free_shipping', 'payment_method_required')
         }),
         ('Giảm giá', {
             'fields': ('discount_type', 'discount_value', 'min_order_amount', 'max_discount')
@@ -45,15 +54,23 @@ class VoucherAdmin(admin.ModelAdmin):
                 from users.models import User
                 all_users = User.objects.filter(is_active=True)[:50]  # Limit for testing
                 
-                if obj.type == 'platform':
+                # Cập nhật logic dùng scope và store
+                if obj.scope == 'platform':
                     # Platform voucher - notify all users
-                    discount_text = f"{obj.discount_value}%" if obj.discount_type == 'percent' else f"{obj.discount_value}đ"
+                    discount_text = f"{obj.discount_value}%" if obj.discount_type == 'percent' else f"{obj.discount_value:,.0f}đ"
                     notify_platform_voucher(all_users, obj.code, discount_text)
-                elif obj.type == 'store' and obj.seller:
+                
+                elif obj.scope == 'store' and obj.store:
                     # Store voucher - notify shop followers
-                    discount_text = f"{obj.discount_value}%" if obj.discount_type == 'percent' else f"{obj.discount_value}đ"
-                    shop_id_int = hash(obj.seller.store_id) % 1000000  # Convert to positive integer
-                    notify_shop_promotion(all_users, shop_id_int, obj.seller.name, f"Giảm {discount_text}", discount_text)
+                    discount_text = f"{obj.discount_value}%" if obj.discount_type == 'percent' else f"{obj.discount_value:,.0f}đ"
+                    
+                    # Giả sử store_id là số, nếu là chuỗi hash tạm
+                    try:
+                        shop_id_int = int(obj.store.pk)
+                    except:
+                        shop_id_int = hash(obj.store.pk) % 1000000
+                    
+                    notify_shop_promotion(all_users, shop_id_int, obj.store.name, f"Giảm {discount_text}", discount_text)
             except Exception as e:
                 print(f"Voucher notification error: {str(e)}")
 

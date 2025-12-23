@@ -16,7 +16,7 @@ class BillingAddressSection extends StatelessWidget{
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SectionHeading(
-            title: 'Shipping Address', 
+            title: 'Địa chỉ giao hàng', 
             buttonTitle: 'Thay đổi', 
             onButtonPressed: () => Get.to(() => const UserAddressScreen())
         ),

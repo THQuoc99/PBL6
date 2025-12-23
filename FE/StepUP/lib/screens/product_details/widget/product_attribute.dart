@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:flutter_app/constants/colors.dart';
-import 'package:flutter_app/constants/sizes.dart';
 import 'package:flutter_app/shop/models/product_model.dart';
-import 'package:flutter_app/widgets/containers/rounded_container.dart';
-import 'package:flutter_app/screens/home/components/section_heading.dart';
 import 'package:flutter_app/shop/controllers/product_variation_controller.dart';
-import 'package:flutter_app/screens/product_details/widget/choice_chip.dart'; 
 
 class ProductAttribute extends StatelessWidget {
   final ProductModel product; 
