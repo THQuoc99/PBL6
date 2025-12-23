@@ -1,3 +1,4 @@
+import 'package:flutter_app/utils/helpers/auth_helper.dart';
 import 'package:get/get.dart';
 import 'package:flutter_app/shop/controllers/user_controller.dart';
 import 'package:flutter_app/screens/account/profile/edit_profile_screen.dart'; // Check đường dẫn import
@@ -39,7 +40,10 @@ class ProfileScreen extends StatelessWidget {
                       : CircularImage(image: AppImages.sabrina, width: 80, height: 80),
                   
                   TextButton(
-                    onPressed: () => Get.to(() => const EditProfileScreen()), 
+                    onPressed: () async {
+                      final ok = await requireLogin(context);
+                      if (ok) Get.to(() => const EditProfileScreen());
+                    },
                     child: const Text('Thay đổi ảnh đại diện')
                   ),
                 ],
@@ -50,27 +54,39 @@ class ProfileScreen extends StatelessWidget {
             const Divider(),
             const SizedBox(height: AppSizes.spaceBtwItems),
 
-            const SectionHeading(title: 'Profile Information', showActionButton: false,),
+            const SectionHeading(title: 'Thông tin cá nhân', showActionButton: false,),
             const SizedBox(height: AppSizes.spaceBtwItems),
 
-            ProfileMenu(title: 'Name', value: userController.fullName.value, onPressed: () => Get.to(() => const EditProfileScreen())),
-            ProfileMenu(title: 'Username', value: userController.username.value, onPressed: () {}),
+            ProfileMenu(title: 'Họ tên', value: userController.fullName.value, onPressed: () async {
+    final ok = await requireLogin(context);
+    if (ok) Get.to(() => const EditProfileScreen());
+  },),
+            ProfileMenu(title: 'Tên đăng nhập', value: userController.username.value, onPressed: () {}),
 
             const SizedBox(height: AppSizes.spaceBtwItems / 2),
             const Divider(),
             const SizedBox(height: AppSizes.spaceBtwItems),
 
-            const SectionHeading(title: 'Personal Information', showActionButton: false,),
+            const SectionHeading(title: 'Thông tin cá nhân', showActionButton: false,),
             const SizedBox(height: AppSizes.spaceBtwItems),
 
-            ProfileMenu(title: 'User ID', value: userController.userID.value, icon: Icons.copy, onPressed: () {}),
-            ProfileMenu(title: 'E-mail', value: userController.email.value, onPressed: () => Get.to(() => const EditProfileScreen())),
-            ProfileMenu(title: 'Phone Number', value: userController.phone.value, onPressed: () => Get.to(() => const EditProfileScreen())),
+            ProfileMenu(title: 'ID', value: userController.userID.value, icon: Icons.copy, onPressed: () {}),
+            ProfileMenu(title: 'E-mail', value: userController.email.value, onPressed: () async {
+    final ok = await requireLogin(context);
+    if (ok) Get.to(() => const EditProfileScreen());
+  },),
+            ProfileMenu(title: 'Số điện thoại', value: userController.phone.value, onPressed: () async {
+    final ok = await requireLogin(context);
+    if (ok) Get.to(() => const EditProfileScreen());
+  },),
             
             ProfileMenu(
                 title: 'Ngày sinh', 
                 value: userController.birthDate.value.isNotEmpty ? userController.birthDate.value : "Chưa cập nhật", 
-                onPressed: () => Get.to(() => const EditProfileScreen())
+                onPressed: () async {
+    final ok = await requireLogin(context);
+    if (ok) Get.to(() => const EditProfileScreen());
+  },
             ),
           ],
         )),

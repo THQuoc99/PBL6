@@ -111,15 +111,22 @@ class CreateReviewSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context.get('request')
-        # Extract files from request.FILES (works for multipart uploads where files are named 'uploaded_images')
-        files = []
-        if request is not None:
-            files = request.FILES.getlist('uploaded_images')
+        files = request.FILES.getlist('uploaded_images') if request is not None else []
 
-        review = Review.objects.create(**validated_data)
+        order_item = validated_data.get('order_item', None)
+        # Nếu đã có review cho order_item này -> trả ValidationError (400)
+        if order_item is not None and Review.objects.filter(order_item=order_item).exists():
+            raise serializers.ValidationError({
+                'order_item': 'Bạn đã gửi đánh giá cho mục đơn hàng này rồi.'
+            })
 
-        # Save uploaded images (if any)
-        for f in files:
-            ReviewImage.objects.create(review=review, image=f)
+        from django.db import transaction, IntegrityError
+        try:
+            with transaction.atomic():
+                review = Review.objects.create(**validated_data)
+                for f in files:
+                    ReviewImage.objects.create(review=review, image=f)
+        except IntegrityError:
+            raise serializers.ValidationError('Đã tồn tại đánh giá cho mục đơn hàng này.')
 
         return review

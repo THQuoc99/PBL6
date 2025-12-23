@@ -7,14 +7,57 @@ import 'package:flutter_app/widgets/containers/rounded_container.dart';
 import 'package:readmore/readmore.dart';
 import 'package:flutter_app/utils/helpers/helper_function.dart';
 import 'package:flutter_app/shop/models/review_model.dart';
+import 'package:get/get.dart';
+import 'package:flutter_app/shop/controllers/user_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 class UserReviewCard extends StatelessWidget {
   final ReviewModel review;
-  const UserReviewCard({super.key, required this.review});
+  final VoidCallback? onDeleted;
+  const UserReviewCard({super.key, required this.review, this.onDeleted});
+
+  Future<void> _deleteReview(BuildContext context) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng đăng nhập')));
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xóa đánh giá'),
+        content: const Text('Bạn có chắc chắn muốn xóa đánh giá của mình?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Hủy')),
+          ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Xóa')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    final uri = Uri.parse('http://10.0.2.2:8000/api/reviews/${review.reviewId}/');
+    final resp = await http.delete(uri, headers: {'Authorization': 'Bearer $token'});
+    if (resp.statusCode == 204 || resp.statusCode == 200) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Xóa đánh giá thành công')));
+      }
+      if (onDeleted != null) onDeleted!();
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi khi xóa: ${resp.body}')));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final dark = HelperFunction.isDarkMode(context);
+    final userCtrl = Get.find<UserController>();
+    final bool isMine = userCtrl.fullName.value.isNotEmpty && userCtrl.fullName.value == review.userName;
+
     return Column(
       children: [
         Row(
@@ -32,7 +75,19 @@ class UserReviewCard extends StatelessWidget {
                 Text(review.userName, style: Theme.of(context).textTheme.titleLarge),
               ],
             ),
-            IconButton(onPressed: () {}, icon: const Icon(Icons.more_vert))
+            // Chỉ hiện menu nếu là review của mình
+            if (isMine)
+              PopupMenuButton<int>(
+                onSelected: (v) async {
+                  if (v == 1) await _deleteReview(context);
+                },
+                itemBuilder: (_) => [
+                  const PopupMenuItem(value: 1, child: Text('Xóa đánh giá', style: TextStyle(color: Colors.red))),
+                ],
+                icon: const Icon(Icons.more_vert),
+              )
+            else
+              const SizedBox(width: 40),
           ],
         ),
         const SizedBox(height: AppSizes.spaceBtwItems),

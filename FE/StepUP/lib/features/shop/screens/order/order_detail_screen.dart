@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/utils/helpers/auth_helper.dart';
 import 'package:get/get.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter_app/shop/models/order_model.dart';
 import 'package:flutter_app/shop/controllers/order_controller.dart';
 import 'package:flutter_app/features/shop/screens/return/create_return_screen.dart';
 import 'package:flutter_app/constants/colors.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'package:flutter_app/features/shop/screens/product_reviews/review_form.dart';
 
 class OrderDetailScreen extends StatelessWidget {
   final OrderModel order;
@@ -437,6 +442,19 @@ class OrderDetailScreen extends StatelessWidget {
                       
                       // Giá
                       Text("\$${(item.quantity * item.priceAtOrder).toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.bold)),
+
+                      // Sau block hiển thị item info (bên phải hiện giá)
+                      Column(
+                        children: [
+                          const SizedBox(height: 8),
+                          if (order.status == 'completed')
+                            ReviewActionButton(
+                              orderItemId: item.itemId,
+                              productId: item.productId != 0 ? item.productId : order.id,
+                              initialVariantId: item.variantId, // truyền variantId từ order item
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 )),
@@ -586,6 +604,103 @@ class OrderDetailScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// Đặt trong same file hoặc tách ra file riêng nếu muốn
+class ReviewActionButton extends StatefulWidget {
+  final int orderItemId;
+  final int productId;
+  final int? initialVariantId;
+  const ReviewActionButton({super.key, required this.orderItemId, required this.productId, this.initialVariantId});
+  @override
+  State<ReviewActionButton> createState() => _ReviewActionButtonState();
+}
+
+class _ReviewActionButtonState extends State<ReviewActionButton> {
+  Future<Map<String, dynamic>> _fetchReview() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    if (token == null) return {'exists': false};
+
+    final uri = Uri.parse('http://10.0.2.2:8000/api/reviews/?order_item=${widget.orderItemId}');
+    final resp = await http.get(uri, headers: {'Authorization': 'Bearer $token'});
+    if (resp.statusCode == 200) {
+      final List data = json.decode(resp.body) as List;
+      if (data.isNotEmpty) {
+        return {'exists': true, 'review': data[0]};
+      }
+    }
+    return {'exists': false};
+  }
+
+  Future<void> _deleteReview(int reviewId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    if (token == null) return;
+
+    final uri = Uri.parse('http://10.0.2.2:8000/api/reviews/$reviewId/');
+    final resp = await http.delete(uri, headers: {'Authorization': 'Bearer $token'});
+    if (resp.statusCode == 204 || resp.statusCode == 200) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Xóa đánh giá thành công')));
+      }
+      setState(() {}); // reload
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Lỗi khi xóa: ${resp.body}')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _fetchReview(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const SizedBox.shrink();
+        }
+        final exists = snap.data!['exists'] as bool;
+        final review = snap.data!['review'];
+        if (!exists) {
+          return ElevatedButton(
+            onPressed: () async {
+              final ok = await requireLogin(context);
+              if (!ok) return;
+              final result = await Get.to(() => ReviewFormScreen(
+                productId: widget.productId,
+                orderItemId: widget.orderItemId,
+                initialVariantId: widget.initialVariantId,
+              ));
+              if (result == true) setState(() {}); // reload after submit
+            },
+            child: const Text('Đánh giá'),
+          );
+        } else {
+          final revId = review['review_id'];
+          return TextButton(
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Xóa đánh giá'),
+                  content: const Text('Bạn có chắc chắn muốn xóa đánh giá của mình?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Hủy')),
+                    ElevatedButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Xóa')),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await _deleteReview(revId);
+              }
+            },
+            child: const Text('Xóa đánh giá', style: TextStyle(color: Colors.red)),
+          );
+        }
+      },
     );
   }
 }

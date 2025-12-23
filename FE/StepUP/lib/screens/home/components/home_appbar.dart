@@ -5,6 +5,7 @@ import 'package:flutter_app/shop/controllers/notification_controller.dart';
 import 'package:flutter_app/widgets/appbar/appbar.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:get/get.dart';
+import 'package:flutter_app/utils/helpers/auth_helper.dart';
 
 class HomeAppBar extends StatelessWidget {
   const HomeAppBar({
@@ -53,7 +54,9 @@ class HomeAppBar extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.notifications, color: Colors.white),
-              onPressed: () {
+              onPressed: () async {
+                final ok = await requireLogin(context);
+                if (!ok) return;
                 Get.to(() => const NotificationScreen());
               },
             ),

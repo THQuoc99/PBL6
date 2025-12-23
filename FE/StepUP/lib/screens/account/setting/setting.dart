@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/utils/helpers/auth_helper.dart';
 import 'package:get/get.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter_app/features/personalization/screens/address/address.dart';
@@ -87,32 +88,52 @@ class SettingScreen extends StatelessWidget {
                     icon: Iconsax.safe_home,
                     subtitle: 'Chỉnh sửa địa chỉ giao hàng',
                     title: 'Địa chỉ của tôi',
-                    onTap: () => Get.to(() => const UserAddressScreen()),
+                    onTap: () async {
+                      final ok = await requireLogin(context);
+                      if (!ok) return;
+                      Get.to(() => const UserAddressScreen());
+                    },
                   ),
                   SettingMenuTitle(
                     icon: Iconsax.profile_2user,
                     subtitle: 'Chỉnh sửa thông tin cá nhân',
                     title: 'Hồ sơ của tôi',
                     // Điều hướng vào trang Profile giống như click vào header
-                    onTap: () => Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => const EditProfileScreen())),
+                    onTap: () async {
+                    final ok = await requireLogin(context);
+                    if (!ok) return;
+                    Get.to(() => const ProfileScreen());
+                  },
                   ),
                   SettingMenuTitle(
                     icon: Iconsax.notification,
                     subtitle: 'Xem tất cả thông báo của bạn',
                     title: 'Thông báo',
-                    onTap: () => Get.to(() => const NotificationScreen()),
+                    onTap: () async {
+                    final ok = await requireLogin(context);
+                    if (!ok) return;
+                    Get.to(() => const NotificationScreen());
+                  },
                   ),
                   SettingMenuTitle(
                     icon: Iconsax.discount_shape,
                     subtitle: 'Voucher đã lưu và ưu đãi của bạn',
                     title: 'Voucher & Ưu đãi',
-                    onTap: () => Get.to(() => const VoucherScreen()),
+                    onTap: () async {
+                    final ok = await requireLogin(context);
+                    if (!ok) return;
+                    Get.to(() => const VoucherScreen());
+                  },
                   ),
                   SettingMenuTitle(
                     icon: Iconsax.shield_tick,
                     subtitle: 'Bảo mật tài khoản và xác thực',
                     title: 'Bảo mật',
-                    onTap: () => Get.to(() => const SecurityScreen()),
+                    onTap: () async {
+                    final ok = await requireLogin(context);
+                    if (!ok) return;
+                    Get.to(() => const SecurityScreen());
+                  },
                   ),
                  
                   const SizedBox(height: AppSizes.spaceBtwItems),
@@ -130,49 +151,65 @@ class SettingScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSizes.spaceBtwItems),
 
-                  // --- ĐĂNG XUẤT ---
-                  SettingMenuTitle(
-                    icon: Iconsax.logout,
-                    subtitle: 'Thoát tài khoản hiện tại',
-                    title: 'Đăng xuất',
-                    onTap: () async {
-                      final shouldLogout = await showDialog<bool>(
-                        context: context,
-                        builder: (BuildContext context) {
-                          return AlertDialog(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            title: const Text('Xác nhận đăng xuất'),
-                            content: const Text('Bạn có chắc chắn muốn đăng xuất không?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(false),
-                                child: const Text('Hủy'),
-                              ),
-                              ElevatedButton(
-                                onPressed: () => Navigator.of(context).pop(true),
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                                child: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
-                              ),
-                            ],
-                          );
+                  // --- ĐĂNG NHẬP / ĐĂNG XUẤT ---
+                  Obx(() {
+                    final isLoggedIn = userController.userID.value.isNotEmpty;
+                    if (!isLoggedIn) {
+                      return SettingMenuTitle(
+                        icon: Iconsax.login,
+                        subtitle: 'Đăng nhập để quản lý tài khoản',
+                        title: 'Đăng nhập',
+                        onTap: () async {
+                          final result = await Get.to(() => const LoginScreen());
+                          if (result == true) {
+                            // Nếu login thành công, bạn có thể tải lại dữ liệu nếu cần
+                            // userController.loadUserData(); // tuỳ chọn nếu muốn ép load lại
+                          }
                         },
                       );
+                    }
 
-                      if (shouldLogout == true) {
-                        try {
-                          await authService.logout();
-                          Get.offAll(() => const LoginScreen());
-                        } catch (e) {
-                          Get.snackbar('Lỗi', 'Không thể đăng xuất: $e',
-                              snackPosition: SnackPosition.BOTTOM,
-                              backgroundColor: Colors.redAccent,
-                              colorText: Colors.white);
+                    // Nếu đã đăng nhập — hiện nút Đăng xuất như trước
+                    return SettingMenuTitle(
+                      icon: Iconsax.logout,
+                      subtitle: 'Thoát tài khoản hiện tại',
+                      title: 'Đăng xuất',
+                      onTap: () async {
+                        final shouldLogout = await showDialog<bool>(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              title: const Text('Xác nhận đăng xuất'),
+                              content: const Text('Bạn có chắc chắn muốn đăng xuất không?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  child: const Text('Hủy'),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.of(context).pop(true),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                  child: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+
+                        if (shouldLogout == true) {
+                          try {
+                            await authService.logout();
+                            Get.offAll(() => const LoginScreen());
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Không thể đăng xuất: $e')));
+                          }
                         }
-                      }
-                    },
-                  ),
+                      },
+                    );
+                  }),
                 ],
               ),
             )

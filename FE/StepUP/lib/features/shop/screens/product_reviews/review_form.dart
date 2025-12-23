@@ -8,7 +8,9 @@ import 'dart:convert';
 
 class ReviewFormScreen extends StatefulWidget {
   final int productId;
-  const ReviewFormScreen({super.key, required this.productId});
+  final int? orderItemId;       // thêm
+  final int? initialVariantId;  // thêm
+  const ReviewFormScreen({super.key, required this.productId, this.orderItemId, this.initialVariantId});
 
   @override
   State<ReviewFormScreen> createState() => _ReviewFormScreenState();
@@ -45,6 +47,11 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
             'option_combinations': e['option_combinations'] ?? {}
           }).toList();
           _loadingVariants = false;
+          // nếu có initialVariantId từ order, chọn nó
+          if (widget.initialVariantId != null) {
+            final found = _variants.any((x) => x['variant_id'] == widget.initialVariantId);
+            if (found) _selectedVariantId = widget.initialVariantId;
+          }
         });
       } else {
         setState(() => _loadingVariants = false);
@@ -114,11 +121,21 @@ class _ReviewFormScreenState extends State<ReviewFormScreen> {
       return;
     }
 
+    // Nếu có variants thì bắt buộc chọn 1 biến thể
+    if (_variants.isNotEmpty && _selectedVariantId == null) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng chọn biến thể sản phẩm để gửi đánh giá.')));
+      return;
+    }
+
     final uri = Uri.parse('http://10.0.2.2:8000/api/reviews/');
     final request = http.MultipartRequest('POST', uri);
     request.headers['Authorization'] = 'Bearer $token';
 
     request.fields['product_id'] = widget.productId.toString();
+    if (widget.orderItemId != null) {
+      request.fields['order_item'] = widget.orderItemId.toString();
+    }
     if (_selectedVariantId != null) {
       request.fields['variant_id'] = _selectedVariantId.toString();
     }

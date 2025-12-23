@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/utils/helpers/auth_helper.dart';
 import 'package:get/get.dart';
 import 'package:flutter_app/constants/sizes.dart';
 import 'package:flutter_app/constants/colors.dart';
@@ -122,7 +123,7 @@ class ProductVariationSheet extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final cartController = Get.put(CartController());
                 
                 // --- LOGIC KIỂM TRA ---
@@ -148,6 +149,9 @@ class ProductVariationSheet extends StatelessWidget {
                   }
 
                   // Nếu ok -> Thêm vào giỏ
+                  // import helper if cần
+                  final ok = await requireLogin(context);
+                  if (!ok) return;
                   cartController.addToCart(variant.id, 1);
                   
                   // --- XỬ LÝ SAU KHI THÊM THÀNH CÔNG ---

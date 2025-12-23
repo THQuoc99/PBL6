@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/constants/sizes.dart';
 import 'package:flutter_app/constants/colors.dart';
+import 'package:flutter_app/utils/helpers/auth_helper.dart';
 import 'package:flutter_app/widgets/appbar/appbar.dart';
 import 'package:flutter_app/utils/helpers/helper_function.dart';
 import 'package:get/get.dart';
@@ -52,9 +53,10 @@ class CartScreen extends StatelessWidget {
           child: SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: hasSelectedItems
-                  ? () => Get.to(() => const CheckoutScreen())
-                  : null, // Disable nút nếu không chọn gì
+              onPressed: hasSelectedItems ? () async {
+                final ok = await requireLogin(context);
+                if (ok) Get.to(() => const CheckoutScreen());
+              } : null, // Disable nút nếu không chọn gì
               child: Text('Thanh toán \$${controller.totalAmount.value.toStringAsFixed(0)}'),
             ),
           ),

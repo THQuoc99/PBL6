@@ -2,15 +2,19 @@ import 'package:intl/intl.dart';
 import 'address_model.dart'; 
 
 class OrderItemModel {
-  final int itemId; 
+  final int itemId;
+  final int productId; // thêm
+  final int? variantId; // thêm (có thể null)
   final String productName;
   final int quantity;
   final double priceAtOrder;
-  final String? productImage; 
-  final Map<String, dynamic> attributes; // Màu, Size
+  final String? productImage;
+  final Map<String, dynamic> attributes;
 
   OrderItemModel({
     required this.itemId,
+    required this.productId,
+    this.variantId,
     required this.productName,
     required this.quantity,
     required this.priceAtOrder,
@@ -19,6 +23,26 @@ class OrderItemModel {
   });
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
+    // productId: ưu tiên trường trực tiếp, nếu không có tìm trong variant->product
+    int parsedProductId = json['product_id'] ?? 0;
+    int? parsedVariantId;
+
+    if ((parsedProductId == 0) && json['variant'] != null) {
+      final variant = json['variant'];
+      // variant may contain product or product_id fields
+      if (variant is Map) {
+        if (variant['product'] != null && variant['product'] is Map) {
+          parsedProductId = variant['product']['product_id'] ?? variant['product']['id'] ?? parsedProductId;
+        }
+        parsedVariantId = variant['variant_id'] ?? variant['id'] ?? parsedVariantId;
+      }
+    }
+
+    // Fallback: sometimes API returns product object at top-level
+    if (parsedProductId == 0 && json['product'] != null && json['product'] is Map) {
+      parsedProductId = json['product']['product_id'] ?? json['product']['id'] ?? parsedProductId;
+    }
+
     String pName = json['product_name'] ?? '';
     if (pName.isEmpty && json['variant'] != null && json['variant']['product'] != null) {
        pName = json['variant']['product']['name'] ?? 'Sản phẩm';
@@ -27,8 +51,6 @@ class OrderItemModel {
     // Xử lý URL ảnh sản phẩm
     String? imgUrl = json['product_image'];
     if (imgUrl != null && !imgUrl.startsWith('http')) {
-        // Nếu là đường dẫn tương đối, thêm domain vào
-        // Thay 10.0.2.2:8000 bằng IP thật của server bạn nếu cần
         if (imgUrl.startsWith('/')) {
             imgUrl = 'http://10.0.2.2:8000$imgUrl';
         } else {
@@ -37,7 +59,9 @@ class OrderItemModel {
     }
 
     return OrderItemModel(
-      itemId: json['item_id'] ?? 0,
+      itemId: json['item_id'] ?? json['id'] ?? 0,
+      productId: parsedProductId,
+      variantId: parsedVariantId,
       productName: pName,
       quantity: json['quantity'] ?? 0,
       priceAtOrder: double.tryParse(json['price_at_order'].toString()) ?? 0.0,
