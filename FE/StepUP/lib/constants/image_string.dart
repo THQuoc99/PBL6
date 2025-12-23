@@ -6,6 +6,8 @@ class AppImages {
 
   // Payment Methods
   static const String vnpay = 'assets/images/payments/vnpay.png';
+  static const String cod = 'assets/images/payments/cod.jpg';
+  //static const String vnpay = 'assets/images/payments/vnpay.png';
 
   // Checkout image
   static const String checkoutsuccess = 'assets/logo/checkout_success.png';

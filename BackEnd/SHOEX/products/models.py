@@ -91,6 +91,7 @@ class Product(models.Model):
 
     is_active = models.BooleanField(default=True, verbose_name="Hoạt động")
     is_featured = models.BooleanField(default=False, verbose_name="Sản phẩm nổi bật")
+    is_returnable = models.BooleanField(default=True, verbose_name="Có thể trả hàng")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -107,12 +108,28 @@ class Product(models.Model):
         return self.name
 
     def save(self, *args, **kwargs):
+        is_new = self.pk is None  # Check if this is a new product
         if not self.slug:
             self.slug = slugify(self.name)[:50] # Cắt ngắn để vừa limit DB
         if not self.model_code:
             count = Product.objects.count() + 1
             self.model_code = f"PRD-{count:04d}"
         super().save(*args, **kwargs)
+        
+        # Send notification to shop followers if this is a new product
+        if is_new and self.is_active:
+            from notifications.utils import notify_shop_new_product
+            try:
+                # Get shop followers (assuming there's a follow relationship)
+                # For now, we'll notify all users as a placeholder
+                # TODO: Implement proper shop follow system
+                from users.models import User
+                followers = User.objects.filter(is_active=True)[:10]  # Limit to 10 users for testing
+                # Use a hash of store_id as integer for shop_id
+                shop_id_int = hash(self.store.store_id) % 1000000  # Convert to positive integer
+                notify_shop_new_product(followers, shop_id_int, self.store.name, self.name)
+            except Exception as e:
+                print(f"Shop notification error: {str(e)}")
 
 
 class ProductAttribute(models.Model):
@@ -212,7 +229,7 @@ class ProductImage(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='product_images', db_column='product_id')
     
     # DB lưu đường dẫn ảnh (varchar 100). Dùng ImageField trong Django vẫn ổn vì nó map ra varchar
-    image = models.ImageField(upload_to='products/gallery/', max_length=100)
+    image = models.ImageField(upload_to='products/', max_length=100)
     
     is_thumbnail = models.BooleanField(default=False)
     alt_text = models.CharField(max_length=200, blank=True, null=True)
@@ -229,3 +246,17 @@ class ProductImage(models.Model):
                 name='unique_product_thumbnail'
             )
         ]
+    
+    @property
+    def image_url(self):
+        """
+        Trả về URL ảnh theo format chuẩn: media/products/{productId}/{productId}_{index}.jpg
+        """
+        # Nếu image field có giá trị hợp lệ, dùng nó
+        if self.image and hasattr(self.image, 'url'):
+            return self.image.url
+        
+        # Fallback: Generate URL theo format chuẩn
+        # Lấy index từ display_order hoặc mặc định 0
+        index = self.display_order if self.display_order >= 0 else 0
+        return f'/media/products/{self.product.product_id}/{self.product.product_id}_{index}.jpg'

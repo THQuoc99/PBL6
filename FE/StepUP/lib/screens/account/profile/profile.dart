@@ -40,7 +40,7 @@ class ProfileScreen extends StatelessWidget {
                   
                   TextButton(
                     onPressed: () => Get.to(() => const EditProfileScreen()), 
-                    child: const Text('Change profile image')
+                    child: const Text('Thay đổi ảnh đại diện')
                   ),
                 ],
               ),
@@ -68,7 +68,7 @@ class ProfileScreen extends StatelessWidget {
             ProfileMenu(title: 'Phone Number', value: userController.phone.value, onPressed: () => Get.to(() => const EditProfileScreen())),
             
             ProfileMenu(
-                title: 'Date of Birth', 
+                title: 'Ngày sinh', 
                 value: userController.birthDate.value.isNotEmpty ? userController.birthDate.value : "Chưa cập nhật", 
                 onPressed: () => Get.to(() => const EditProfileScreen())
             ),

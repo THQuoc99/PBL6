@@ -10,41 +10,36 @@ import 'package:flutter_app/shop/models/order_model.dart';
 import 'package:flutter_app/features/shop/screens/order/order_detail_screen.dart';
 
 class OrderListItems extends StatelessWidget {
-  const OrderListItems({super.key});
+  final List<OrderModel> orders;
+  
+  const OrderListItems({super.key, required this.orders});
 
   @override
   Widget build(BuildContext context) {
     final dark = HelperFunction.isDarkMode(context);
-    final controller = Get.put(OrderListController());
 
-    return Obx(() {
-      if (controller.isLoading.value) {
-        return const Center(child: CircularProgressIndicator());
-      }
-
-      if (controller.orders.isEmpty) {
-        return const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Iconsax.box, size: 60, color: Colors.grey),
-              SizedBox(height: 16),
-              Text("Bạn chưa có đơn hàng nào."),
-            ],
-          ),
-        );
-      }
-
-      return ListView.separated(
-        shrinkWrap: true,
-        itemCount: controller.orders.length,
-        separatorBuilder: (_, __) => const SizedBox(height: AppSizes.spaceBtwItems),
-        itemBuilder: (_, index) {
-          final order = controller.orders[index];
-          return _buildOrderCard(context, dark, order);
-        },
+    if (orders.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Iconsax.box, size: 60, color: Colors.grey),
+            SizedBox(height: 16),
+            Text("Không có đơn hàng nào."),
+          ],
+        ),
       );
-    });
+    }
+
+    return ListView.separated(
+      shrinkWrap: true,
+      itemCount: orders.length,
+      separatorBuilder: (_, __) => const SizedBox(height: AppSizes.spaceBtwItems),
+      itemBuilder: (_, index) {
+        final order = orders[index];
+        return _buildOrderCard(context, dark, order);
+      },
+    );
   }
 
   Widget _buildOrderCard(BuildContext context, bool dark, OrderModel order) {

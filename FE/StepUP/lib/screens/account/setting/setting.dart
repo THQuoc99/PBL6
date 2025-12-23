@@ -3,6 +3,10 @@ import 'package:get/get.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter_app/features/personalization/screens/address/address.dart';
 import 'package:flutter_app/screens/account/profile/profile.dart';
+import 'package:flutter_app/screens/notification/notification_screen.dart';
+import 'package:flutter_app/screens/account/voucher/voucher_screen.dart';
+import 'package:flutter_app/screens/account/security/security_screen.dart';
+import 'package:flutter_app/screens/account/help/help_screen.dart';
 import 'package:flutter_app/screens/home/components/section_heading.dart';
 import 'package:flutter_app/widgets/list_title/setting_menu_title.dart';
 import 'package:flutter_app/widgets/list_title/user_profile_title.dart';
@@ -32,34 +36,16 @@ class SettingScreen extends StatelessWidget {
                 children: [
                   // App bar với nút Logout
                   CusAppbar(
+                    showCart: true,
+                    iconColor: Colors.white,
                     title: Text(
-                      'Account',
+                      'Tài khoản của bạn',
                       style: Theme.of(context)
                           .textTheme
                           .headlineMedium!
                           .apply(color: Colors.white),
                     ),
-                    actions: [
-                      IconButton(
-                        icon: const Icon(Iconsax.logout, color: Colors.white),
-                        tooltip: 'Logout',
-                        onPressed: () async {
-                          try {
-                            await authService.logout();
-                            // Dùng offAll để xóa lịch sử điều hướng, tránh user back lại được
-                            Get.offAll(() => const LoginScreen());
-                          } catch (e) {
-                            Get.snackbar(
-                              'Lỗi',
-                              'Không thể đăng xuất: $e',
-                              snackPosition: SnackPosition.BOTTOM,
-                              backgroundColor: Colors.redAccent,
-                              colorText: Colors.white,
-                            );
-                          }
-                        },
-                      )
-                    ],
+                    actions: [],
                   ),
                   const SizedBox(height: AppSizes.spaceBtwSections),
 
@@ -85,67 +71,100 @@ class SettingScreen extends StatelessWidget {
               child: Column(
                 children: [
                   const SectionHeading(
-                    title: 'Account Settings',
+                    title: 'Cài đặt',
                     showActionButton: false,
                   ),
                   const SizedBox(height: AppSizes.spaceBtwItems),
 
                   SettingMenuTitle(
                     icon: Iconsax.safe_home,
-                    subtitle: 'Delivery Address',
-                    title: 'My Address',
+                    subtitle: 'Chỉnh sửa địa chỉ giao hàng',
+                    title: 'Địa chỉ của tôi',
                     onTap: () => Get.to(() => const UserAddressScreen()),
                   ),
                   SettingMenuTitle(
                     icon: Iconsax.profile_2user,
-                    subtitle: 'Edit your profile',
-                    title: 'My profile',
+                    subtitle: 'Chỉnh sửa thông tin cá nhân',
+                    title: 'Hồ sơ của tôi',
                     // Điều hướng vào trang Profile giống như click vào header
                     onTap: () => Get.to(() => const ProfileScreen()),
                   ),
                   SettingMenuTitle(
-                    icon: Iconsax.bank,
-                    subtitle: 'Add your payment method',
-                    title: 'Payment',
-                    onTap: () {},
-                  ),
-                  SettingMenuTitle(
                     icon: Iconsax.notification,
-                    subtitle: 'Check your noti',
-                    title: 'Notification',
-                    onTap: () {},
+                    subtitle: 'Xem tất cả thông báo của bạn',
+                    title: 'Thông báo',
+                    onTap: () => Get.to(() => const NotificationScreen()),
                   ),
                   SettingMenuTitle(
-                    icon: Iconsax.shopping_cart,
-                    subtitle: 'Your cart settings',
-                    title: 'Cart',
-                    onTap: () => Get.to(() => const CartScreen(showBackArrow: true)),
+                    icon: Iconsax.discount_shape,
+                    subtitle: 'Voucher đã lưu và ưu đãi của bạn',
+                    title: 'Voucher & Ưu đãi',
+                    onTap: () => Get.to(() => const VoucherScreen()),
                   ),
                   SettingMenuTitle(
-                    icon: Iconsax.shield,
-                    subtitle: 'Improve your account protect',
-                    title: 'Privacy',
-                    onTap: () {},
+                    icon: Iconsax.shield_tick,
+                    subtitle: 'Bảo mật tài khoản và xác thực',
+                    title: 'Bảo mật',
+                    onTap: () => Get.to(() => const SecurityScreen()),
                   ),
-
+                 
                   const SizedBox(height: AppSizes.spaceBtwItems),
                   const SectionHeading(
-                    title: 'Customer Service',
+                    title: 'Dịch vụ hỗ trợ khách hàng',
                     showActionButton: false,
                   ),
                   const SizedBox(height: AppSizes.spaceBtwItems),
 
                   SettingMenuTitle(
                     icon: Iconsax.support,
-                    subtitle: 'Inbox if you need help',
-                    title: 'Help Center',
-                    onTap: () {},
+                    subtitle: 'Liên hệ nếu bạn cần trợ giúp',
+                    title: 'Trợ giúp & Phản hồi',
+                    onTap: () => Get.to(() => const HelpScreen()),
                   ),
+                  const SizedBox(height: AppSizes.spaceBtwItems),
+
+                  // --- ĐĂNG XUẤT ---
                   SettingMenuTitle(
-                    icon: Iconsax.star,
-                    subtitle: 'Give us your feeling',
-                    title: 'Feedback',
-                    onTap: () {},
+                    icon: Iconsax.logout,
+                    subtitle: 'Thoát tài khoản hiện tại',
+                    title: 'Đăng xuất',
+                    onTap: () async {
+                      final shouldLogout = await showDialog<bool>(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            title: const Text('Xác nhận đăng xuất'),
+                            content: const Text('Bạn có chắc chắn muốn đăng xuất không?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(false),
+                                child: const Text('Hủy'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => Navigator.of(context).pop(true),
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                child: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+
+                      if (shouldLogout == true) {
+                        try {
+                          await authService.logout();
+                          Get.offAll(() => const LoginScreen());
+                        } catch (e) {
+                          Get.snackbar('Lỗi', 'Không thể đăng xuất: $e',
+                              snackPosition: SnackPosition.BOTTOM,
+                              backgroundColor: Colors.redAccent,
+                              colorText: Colors.white);
+                        }
+                      }
+                    },
                   ),
                 ],
               ),

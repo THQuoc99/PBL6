@@ -1,4 +1,4 @@
-import 'dart:async'; // Import để dùng Timer
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_app/shop/controllers/search_controller.dart' as my_search;
@@ -15,22 +15,12 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  // Dùng Timer để Debounce (chống spam API)
-  Timer? _debounce;
+  final TextEditingController _textController = TextEditingController();
 
   @override
   void dispose() {
-    _debounce?.cancel();
+    _textController.dispose();
     super.dispose();
-  }
-
-  void _onSearchChanged(String query, my_search.SearchController controller) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    
-    // Chỉ gọi API sau khi người dùng ngừng gõ 500ms
-    _debounce = Timer(const Duration(milliseconds: 500), () {
-      controller.searchProducts(query);
-    });
   }
 
   @override
@@ -45,19 +35,35 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.all(AppSizes.defaultSpace),
         child: Column(
           children: [
-            // --- THANH TÌM KIẾM ---
-            TextField(
-              autofocus: true, 
-              onChanged: (value) => _onSearchChanged(value, controller),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Iconsax.search_normal),
-                hintText: 'Nhập tên giày, thương hiệu...',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+            // --- THANH TÌM KIẾM (có nút Search) ---
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _textController,
+                    autofocus: true,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (value) => controller.searchProducts(value.trim()),
+                    decoration: InputDecoration(
+                      hintText: 'Nhập tên giày, thương hiệu...',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                    ),
+                  ),
                 ),
-                filled: true,
-                fillColor: Colors.grey[100],
-              ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () => controller.searchProducts(_textController.text.trim()),
+                  child: const Icon(Iconsax.search_normal),
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
 

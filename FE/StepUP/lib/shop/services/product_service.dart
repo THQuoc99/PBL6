@@ -3,8 +3,12 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_app/shop/models/product_model.dart';
 
 class ProductService {
+  // Backend API endpoints
+  static const String _baseUrl = 'http://10.0.2.2:8000';
+  static const String _graphqlUrl = '$_baseUrl/graphql/';
+  static const String _mediaUrl = '$_baseUrl/media/product';
+  
   // Trả về danh sách sản phẩm (featured) từ GraphQL endpoint
-  static const String _graphqlUrl = 'http://10.0.2.2:8000/graphql/';
 
   static Future<List<ProductModel>> getFeaturedProducts({int first = 8}) async {
     final query = '''

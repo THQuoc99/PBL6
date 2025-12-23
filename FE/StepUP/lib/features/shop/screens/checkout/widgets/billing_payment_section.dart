@@ -47,9 +47,9 @@ class BillingPaymentSection extends StatelessWidget {
 
   String _getPaymentIcon(String method) {
     switch (method) {
-      case 'PAYPAL': return 'assets/icons/payment_methods/paypal.png'; // Thay bằng ảnh thật của bạn
-      case 'VNPAY': return 'assets/logo/vnpay-logo-inkythuatso-01.png';
-      default: return 'assets/icons/payment_methods/cod.png';
+      case 'PAYPAL': return 'assets/images/payments/paypal.png';
+      case 'VNPAY': return 'assets/images/payments/vnpay.png';
+      default: return 'assets/images/payments/cod.jpg';
     }
   }
 

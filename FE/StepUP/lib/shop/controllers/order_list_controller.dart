@@ -9,12 +9,27 @@ class OrderListController extends GetxController {
 
   final isLoading = false.obs;
   final orders = <OrderModel>[].obs;
+  final selectedStatus = Rxn<String>(); // null = all
   final String baseUrl = "http://10.0.2.2:8000/api/orders"; 
+
+  /// Filtered orders theo status
+  List<OrderModel> get filteredOrders {
+    if (selectedStatus.value == null) {
+      return orders;
+    }
+    return orders.where((o) => o.status == selectedStatus.value).toList();
+  }
+
+  /// Set filter status
+  void setFilterStatus(String? status) {
+    selectedStatus.value = status;
+  } 
 
   @override
   void onInit() {
-    fetchUserOrders();
     super.onInit();
+    // Don't auto-fetch here, let the screen trigger it
+    // This prevents race condition with UI building
   }
 
   Future<void> fetchUserOrders() async {

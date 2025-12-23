@@ -10,11 +10,62 @@ class CartItemSerializer(serializers.ModelSerializer):
     attributes = serializers.JSONField(source='variant.option_combinations', read_only=True)
     image = serializers.SerializerMethodField()
     sub_total = serializers.SerializerMethodField()
+    
+    # Thêm thông tin store để tính phí ship riêng
+    store_id = serializers.CharField(source='variant.product.store.store_id', read_only=True)
+    store_name = serializers.CharField(source='variant.product.store.name', read_only=True)
+    
+    # Địa chỉ kho hàng của store (lấy default address)
+    store_address = serializers.SerializerMethodField()
 
     class Meta:
         model = CartItem
         fields = ['item_id', 'variant', 'product_id', 'product_name', 'brand', 'attributes', 
-                  'quantity', 'price', 'image', 'sub_total']
+                  'quantity', 'price', 'image', 'sub_total', 'store_id', 'store_name', 'store_address']
+    
+    def get_store_address(self, obj):
+        """Lấy địa chỉ kho mặc định của store"""
+        try:
+            from django.conf import settings
+            store = obj.variant.product.store
+            default_addr = store.addresses.filter(is_default=True).first()
+            
+            if default_addr:
+                # GHTK cần: province (tỉnh), district (quận/huyện), ward (phường/xã)
+                # AddressStore fields: province, hamlet (quận/huyện), ward (phường/xã)
+                
+                district = default_addr.hamlet  # hamlet = quận/huyện
+                
+                # Validate district - nếu là số hoặc "Khu phố" thì dùng warehouse mặc định
+                if not district or district.strip().isdigit() or 'khu phố' in district.lower():
+                    # Fallback to default warehouse
+                    print(f"⚠️ Invalid district '{district}' for store {store.store_id}, using default warehouse")
+                    warehouse = settings.WAREHOUSE_ADDRESS
+                    return {
+                        'province': warehouse['province'],
+                        'district': warehouse['district'],
+                        'ward': warehouse.get('ward', ''),
+                        'detail': warehouse.get('detail', '')
+                    }
+                
+                return {
+                    'province': default_addr.province,
+                    'district': district,  # hamlet = district
+                    'ward': default_addr.ward,
+                    'detail': default_addr.detail
+                }
+            
+            # No address found, use default warehouse
+            warehouse = settings.WAREHOUSE_ADDRESS
+            return {
+                'province': warehouse['province'],
+                'district': warehouse['district'],
+                'ward': warehouse.get('ward', ''),
+                'detail': warehouse.get('detail', '')
+            }
+        except Exception as e:
+            print(f"❌ Error getting store address: {e}")
+            return None
 
     def get_image(self, obj):
         try:

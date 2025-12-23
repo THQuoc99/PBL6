@@ -39,7 +39,7 @@ class HelperFunction {
               onPressed: () {
                 Navigator.of(context).pop();
               },
-              child: Text('OK'),
+              child: Text('Đồng ý'),
             ),
           ],
         );

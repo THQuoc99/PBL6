@@ -75,10 +75,13 @@ class OrderModel {
   final String status;
   final String paymentStatus; 
   final double totalAmount;
+  final double shippingFee;
   final DateTime orderDate;
   final String paymentMethod;
   final AddressModel? address;
-  final List<SubOrderModel> subOrders; 
+  final List<SubOrderModel> subOrders;
+  final bool hasReturnRequest; // Check if order has return request
+  final String? notes; // Order notes 
 
   OrderModel({
     required this.id,
@@ -86,21 +89,22 @@ class OrderModel {
     required this.paymentStatus,
     required this.totalAmount,
     required this.orderDate,
+    this.shippingFee = 0.0,
     this.paymentMethod = 'COD',
     this.address,
     this.subOrders = const [],
+    this.hasReturnRequest = false, // Default false
+    this.notes,
   });
 
-  // ✅ FIX LỖI 1: Thêm getter orderStatusText
+  // Order status display text
   String get orderStatusText {
     switch (status.toLowerCase()) {
-      case 'pending': return 'Chờ thanh toán';
-      case 'paid': return 'Đã thanh toán';
-      case 'confirmed': return 'Đã xác nhận';
+      case 'pending': return 'Chờ xác nhận';
+      case 'processing': return 'Đang xử lý';
       case 'shipped': return 'Đang giao hàng';
       case 'completed': return 'Hoàn thành';
       case 'cancelled': return 'Đã hủy';
-      case 'failed': return 'Thất bại';
       default: return status;
     }
   }
@@ -127,10 +131,13 @@ class OrderModel {
       status: json['status'] ?? 'pending',
       paymentStatus: json['payment_status'] ?? 'pending',
       totalAmount: double.tryParse(json['total_amount'].toString()) ?? 0.0,
+      shippingFee: double.tryParse(json['shipping_fee']?.toString() ?? '0') ?? 0.0,
       orderDate: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
       paymentMethod: json['payment_method'] ?? 'COD',
       address: json['address'] != null ? AddressModel.fromJson(json['address']) : null,
       subOrders: subOrdersList,
+      hasReturnRequest: json['has_return_request'] ?? false,
+      notes: json['notes'],
     );
   }
   

@@ -13,6 +13,7 @@ import 'package:flutter_app/widgets/products/product_cards/product_card_vertical
 import 'package:flutter_app/features/shop/screens/all_products/all_products.dart';
 import 'package:flutter_app/features/shop/screens/search/search_screen.dart';
 import 'package:flutter_app/shop/controllers/home_controller.dart';
+import 'package:flutter_app/shop/controllers/notification_controller.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -20,6 +21,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.put(HomeController());
+    final notificationController = Get.put(NotificationController());
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -32,16 +34,14 @@ class HomeScreen extends StatelessWidget {
                   // 1. Appbar
                   const HomeAppBar(),
                   
-                  // ✅ SỬA: Giảm khoảng cách (Dùng spaceBtwItems thay vì spaceBtwSections)
                   const SizedBox(height: AppSizes.spaceBtwItems), 
 
                   // 2. Thanh tìm kiếm
                   SearchContainer(
-                    hintText: "Search your favorite",
+                    hintText: "Tìm kiếm sản phẩm",
                     ontap: () => Get.to(() => const SearchScreen()), 
                   ),
                   
-                  // ✅ SỬA: Giảm khoảng cách xuống còn 16px (hoặc nhỏ hơn tùy bạn)
                   const SizedBox(height: AppSizes.spaceBtwItems), 
 
                   // 3. Danh mục sản phẩm
@@ -50,7 +50,7 @@ class HomeScreen extends StatelessWidget {
                     child: Column(
                       children: [
                         SectionHeading(
-                          title: "Popular Categories", 
+                          title: "Danh mục sản phẩm", 
                           showActionButton: false,
                           textColor: Colors.white,
                         ),
@@ -81,7 +81,7 @@ class HomeScreen extends StatelessWidget {
 
                   // 5. Heading Sản Phẩm
                   SectionHeading(
-                    title: 'Popular Product',
+                    title: 'Sản phẩm phổ biến',
                     onButtonPressed: () => Get.to(() => const AllProducts()),
                   ),
                   const SizedBox(height: AppSizes.spaceBtwItems),

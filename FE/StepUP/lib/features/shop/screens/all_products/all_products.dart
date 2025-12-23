@@ -15,7 +15,7 @@ class AllProducts extends StatelessWidget {
     final controller = Get.put(AllProductsController());
 
     return Scaffold(
-      appBar: const CusAppbar(title: Text('All Products'), showBackArrow: true,),
+      appBar: const CusAppbar(title: Text('Tất cả sản phẩm'), showBackArrow: true,),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(AppSizes.defaultSpace),

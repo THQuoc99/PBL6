@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_app/constants/sizes.dart';
-import 'package:flutter_app/constants/image_string.dart'; 
+import 'package:flutter_app/constants/image_string.dart';
 import 'package:flutter_app/screens/home/components/section_heading.dart';
 import 'package:flutter_app/widgets/appbar/appbar.dart';
 import 'package:flutter_app/widgets/image/rounded_image.dart';
@@ -71,18 +71,16 @@ class SubCategoriesScreen extends StatelessWidget {
                       return const Center(child: Text("Chưa có sản phẩm nào trong danh mục này."));
                     }
 
-                    return SizedBox(
-                      height: 120,
-                      child: ListView.separated(
-                        itemCount: controller.products.length,
-                        scrollDirection: Axis.horizontal,
-                        separatorBuilder: (context, index) => const SizedBox(width: AppSizes.spaceBtwItems),
-                        itemBuilder: (context, index) {
-                          final product = controller.products[index];
-                          // Truyền product vào Card
-                          return ProductCardHorizontal(product: product); 
-                        },
-                      ),
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: controller.products.length,
+                      separatorBuilder: (context, index) => const SizedBox(height: AppSizes.spaceBtwItems),
+                      itemBuilder: (context, index) {
+                        final product = controller.products[index];
+                        // Truyền product vào Card
+                        return ProductCardHorizontal(product: product); 
+                      },
                     );
                   })
                 ],

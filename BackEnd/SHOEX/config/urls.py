@@ -17,12 +17,12 @@ urlpatterns = [
     path('api/address/', include('address.urls')),
     path('api/cart/', include('cart.urls')),
     path('api/orders/', include('orders.urls')),
-
-    # --- CÁC APP MỚI CẦN BỔ SUNG (Để khớp với datanew.sql) ---
-    path('api/store/', include('store.urls')),       # Quan trọng: Quản lý cửa hàng
-    path('api/reviews/', include('reviews.urls')),   # Đánh giá sản phẩm
-    path('api/shipments/', include('shipments.urls')), # Theo dõi vận chuyển
-    path('api/discounts/', include('discount.urls')),  # Quản lý Voucher
+    path('api/store/', include('store.urls')),       
+    path('api/reviews/', include('reviews.urls')),   
+    path('api/shipments/', include('shipments.urls')), 
+    path('api/discounts/', include('discount.urls')),
+    path('api/', include('returns.urls')),
+    path('api/notifications/', include('notifications.urls')),
 ]
 
 if settings.DEBUG:

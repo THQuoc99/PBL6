@@ -168,7 +168,9 @@ class CartItem(models.Model):
     class Meta:
         verbose_name = "Sản phẩm trong giỏ hàng"
         verbose_name_plural = "Sản phẩm trong giỏ hàng"
-        ordering = ['-updated_at']
+        # Order theo created_at để giữ thứ tự thêm vào giỏ (item cũ ở trên)
+        # Hoặc dùng 'item_id' để sort theo ID tăng dần
+        ordering = ['created_at']
         indexes = [
             models.Index(fields=['cart']),
             models.Index(fields=['variant']),

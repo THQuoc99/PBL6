@@ -53,6 +53,11 @@ class AddNewAddressScreen extends StatelessWidget {
                   }).toList(),
                   onChanged: (val) {
                     controller.selectedProvince.value = val;
+                    // Reset huyện và xã khi đổi tỉnh
+                    controller.selectedDistrict.value = null;
+                    controller.selectedWard.value = null;
+                    controller.districts.clear();
+                    controller.wards.clear();
                     if (val != null) controller.fetchDistricts(val.id);
                   },
                 )),
@@ -64,6 +69,9 @@ class AddNewAddressScreen extends StatelessWidget {
                   value: controller.selectedDistrict.value,
                   onChanged: controller.districts.isEmpty ? null : (val) {
                     controller.selectedDistrict.value = val;
+                    // Reset xã khi đổi huyện
+                    controller.selectedWard.value = null;
+                    controller.wards.clear();
                     if (val != null) controller.fetchWards(val.id); // Huyện -> Xã
                   },
                   items: controller.districts.map((d) {

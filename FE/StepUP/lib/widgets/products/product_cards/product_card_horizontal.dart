@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/constants/colors.dart';
-import 'package:flutter_app/constants/image_string.dart';
 import 'package:flutter_app/constants/sizes.dart';
 import 'package:flutter_app/shop/models/product_model.dart'; 
 import 'package:flutter_app/screens/product_details/product_detail.dart'; 
@@ -13,6 +12,7 @@ import 'package:flutter_app/widgets/texts/product_price_text.dart';
 import 'package:flutter_app/widgets/texts/product_title_text.dart';
 import 'package:get/get.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:flutter_app/shop/controllers/wishlist_controller.dart';
 
 class ProductCardHorizontal extends StatelessWidget {
   final ProductModel product; // ✅ THÊM THAM SỐ NÀY
@@ -25,11 +25,11 @@ class ProductCardHorizontal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = HelperFunction.isDarkMode(context);
+    final wishlistController = Get.put(WishlistController());
 
-    // Xử lý URL ảnh
-    String imageUrl = product.image ?? "";
-    if (imageUrl.startsWith("/media")) imageUrl = "http://10.0.2.2:8000$imageUrl";
-    final bool isNetworkImage = imageUrl.startsWith("http");
+    // Xử lý URL ảnh - Luôn dùng product ID để tạo URL chuẩn
+    String imageUrl = "http://10.0.2.2:8000/media/products/${product.id}/${product.id}_0.jpg";
+    final bool isNetworkImage = true;
 
     return GestureDetector(
       onTap: () => Get.to(() => ProductDetail(product: product)), // ✅ CHUYỂN TRANG CHI TIẾT
@@ -54,7 +54,7 @@ class ProductCardHorizontal extends StatelessWidget {
                     height: 120,
                     width: 120,
                     child: RoundedImage(
-                      imageUrl: isNetworkImage ? imageUrl : AppImages.football1, 
+                      imageUrl: imageUrl, 
                       isNetworkImage: isNetworkImage,
                       applyImageRadius: true
                     ),
@@ -72,13 +72,17 @@ class ProductCardHorizontal extends StatelessWidget {
                   ),
 
                   // Favorite Icon
-                  const Positioned(
+                  Positioned(
                     top: 0,
                     right: 0,
-                    child: CircularIcon(
-                      icon: Iconsax.heart,
-                      color: Colors.red,
-                    ),
+                    child: Obx(() {
+                      final isFavorite = wishlistController.isFavorite(product.id);
+                      return CircularIcon(
+                        icon: Iconsax.heart,
+                        color: isFavorite ? Colors.red : Colors.grey,
+                        onpress: () => wishlistController.toggleFavorite(product),
+                      );
+                    }),
                   )
                 ],
               ),

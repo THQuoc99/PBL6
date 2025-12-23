@@ -74,6 +74,35 @@ class Shipment(models.Model):
 
     def __str__(self):
         return f"Shipment #{self.shipment_id} - {self.tracking_code}"
+    
+    def save(self, *args, **kwargs):
+        """Override save để tự động sync status sang SubOrder"""
+        super().save(*args, **kwargs)
+        self._sync_status_to_suborder()
+    
+    def _sync_status_to_suborder(self):
+        """Đồng bộ status từ Shipment sang SubOrder
+        
+        SubOrder STATUS_CHOICES: pending, paid, processing, shipped, completed, cancelled
+        """
+        status_mapping = {
+            'pending': 'paid',         # Chờ lấy → paid (đã thanh toán, chờ lấy hàng)
+            'picked': 'processing',    # Đã lấy → processing (đang xử lý/đóng gói)
+            'shipped': 'shipped',      # Đang giao → shipped (đang vận chuyển)
+            'delivered': 'completed',  # Đã giao → completed
+            'failed': 'cancelled',     # Thất bại → cancelled
+            'cancelled': 'cancelled',  # Hủy → cancelled
+        }
+        
+        new_status = status_mapping.get(self.status)
+        if new_status and self.sub_order.status != new_status:
+            self.sub_order.status = new_status
+            # Update timestamps
+            if self.status == 'shipped':
+                self.sub_order.shipped_at = timezone.now()
+            elif self.status == 'delivered':
+                self.sub_order.delivered_at = timezone.now()
+            self.sub_order.save()
 
 
 class ShipmentTracking(models.Model):

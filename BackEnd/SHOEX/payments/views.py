@@ -19,7 +19,7 @@ class DeepLinkRedirect(HttpResponseRedirect):
 
 # ------------------ CẤU HÌNH CHUNG ------------------
 # Thay bằng domain ngrok của bạn hoặc http://10.0.2.2:8000 nếu chạy local hoàn toàn
-NGROK_HOST = "https://successive-idella-unsparingly.ngrok-free.dev" 
+NGROK_HOST = "https://successive-idella-unsparingly.ngrok-free.dev"
 USD_RATE = 26360.0
 
 # ------------------ PAYPAL CONFIG ------------------
@@ -110,10 +110,10 @@ def paypal_success(request):
             local_payment.paid_at = timezone.now()
             local_payment.save()
 
-            order.status = "paid"
+            order.status = "processing"
             order.payment_status = "paid"
             order.save()
-            order.sub_orders.all().update(status='paid')
+            order.sub_orders.all().update(status='processing')
 
         except Payment.DoesNotExist:
             return DeepLinkRedirect("myapp://payment-return?status=error&message=PaymentNotFound")
@@ -245,10 +245,10 @@ def vnpay_return(request):
         payment.paid_at = timezone.now()
         payment.save()
         
-        order.status = "paid"
+        order.status = "processing"
         order.payment_status = "paid"
         order.save()
-        order.sub_orders.all().update(status='paid')
+        order.sub_orders.all().update(status='processing')
         
         return DeepLinkRedirect(f"myapp://payment-return?status=success&order_id={vnp_TxnRef}")
         
@@ -298,10 +298,10 @@ def vnpay_ipn(request):
         local_payment.transaction_id = vnp_TransactionNo
         local_payment.save()
         
-        local_order.status = "paid"
+        local_order.status = "processing"
         local_order.payment_status = "paid"
         local_order.save()
-        local_order.sub_orders.all().update(status='paid')
+        local_order.sub_orders.all().update(status='processing')
     else:
         local_payment.status = "failed"
         local_payment.save()

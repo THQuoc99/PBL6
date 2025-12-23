@@ -5,6 +5,43 @@ from .serializers import UserRegistrationSerializer, CustomTokenObtainPairSerial
 from .models import User
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.views import APIView
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from rest_framework import status
+from rest_framework.response import Response
+
+
+class ChangePasswordView(APIView):
+    """REST API endpoint để đổi mật khẩu (POST).
+
+    Body: { "current_password": "...", "new_password": "..." }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        current = request.data.get('current_password')
+        new = request.data.get('new_password')
+
+        if not current or not new:
+            return Response({'error': 'Thiếu current_password hoặc new_password'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.check_password(current):
+            return Response({'error': 'Mật khẩu hiện tại không đúng'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            validate_password(new, user)
+        except ValidationError as e:
+            return Response({'error': e.messages}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user.set_password(new)
+            user.save()
+            return Response({'success': True, 'message': 'Đổi mật khẩu thành công'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class UserRegistrationView(generics.CreateAPIView):
     """
@@ -50,6 +87,7 @@ class UserRegistrationView(generics.CreateAPIView):
             "avatar": avatar_url,
             "birth_date": user.birth_date
         }, status=status.HTTP_201_CREATED)
+
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     """

@@ -4,11 +4,43 @@ import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-// Model tin nhắn đơn giản
+// Product model for chat
+class ChatProduct {
+  final int id;
+  final String name;
+  final int price;
+  final String? image;
+  
+  ChatProduct({
+    required this.id,
+    required this.name,
+    required this.price,
+    this.image,
+  });
+  
+  factory ChatProduct.fromJson(Map<String, dynamic> json) {
+    return ChatProduct(
+      id: json['id'],
+      name: json['name'],
+      price: json['price'],
+      image: json['image'],
+    );
+  }
+}
+
+// Model tin nhắn với danh sách sản phẩm
 class ChatMessage {
   final String text;
   final bool isUser;
-  ChatMessage({required this.text, required this.isUser});
+  final List<ChatProduct>? products;
+  final String? recommendation; // Text gợi ý riêng
+  
+  ChatMessage({
+    required this.text,
+    required this.isUser,
+    this.products,
+    this.recommendation,
+  });
 }
 
 class ChatController extends GetxController {
@@ -60,7 +92,22 @@ class ChatController extends GetxController {
       if (response.statusCode == 200) {
         final data = jsonDecode(utf8.decode(response.bodyBytes));
         final botReply = data['response'];
-        messages.add(ChatMessage(text: botReply, isUser: false));
+        final recommendation = data['recommendation'];
+        
+        // Parse products list
+        List<ChatProduct>? products;
+        if (data['products'] != null && data['products'] is List) {
+          products = (data['products'] as List)
+              .map((p) => ChatProduct.fromJson(p))
+              .toList();
+        }
+        
+        messages.add(ChatMessage(
+          text: botReply,
+          isUser: false,
+          products: products,
+          recommendation: recommendation,
+        ));
       } else {
         messages.add(ChatMessage(text: "Lỗi server: ${response.statusCode}", isUser: false));
       }

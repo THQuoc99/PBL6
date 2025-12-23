@@ -7,7 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_links/app_links.dart';
 import 'package:flutter_app/shop/controllers/cart_controller.dart';
+import 'package:flutter_app/shop/controllers/voucher_controller.dart';
 import 'package:flutter_app/shop/controllers/address_controller.dart';
+import 'package:flutter_app/shop/controllers/shipping_controller.dart';
 import 'package:flutter_app/shop/controllers/order_list_controller.dart'; 
 import 'package:flutter_app/common/widgets/success_screen/success_screen.dart';
 import 'package:flutter_app/constants/image_string.dart';
@@ -24,6 +26,7 @@ class OrderController extends GetxController {
 
   final isLoading = false.obs;
   final selectedPaymentMethod = 'VNPAY'.obs;
+  final noteController = TextEditingController();
 
   final String baseUrl = "http://10.0.2.2:8000/api/orders";
 
@@ -38,6 +41,7 @@ class OrderController extends GetxController {
   @override
   void onClose() {
     _linkSubscription?.cancel();
+    noteController.dispose();
     super.onClose();
   }
 
@@ -99,9 +103,147 @@ class OrderController extends GetxController {
         return;
       }
 
+      final shippingController = Get.find<ShippingController>();
+      final voucherController = Get.find<VoucherController>();
+
+      // Tính subtotal theo store để back-end áp voucher per-store
+      final Map<String, double> storeSubtotals = {};
+      for (var item in cartController.selectedItems) {
+        final sid = item.storeId ?? 'unknown';
+        storeSubtotals[sid] = (storeSubtotals[sid] ?? 0) + item.subTotal;
+      }
+
+      // Nếu user đã chọn voucher thủ công, dùng voucher đó; nếu không thì chọn tự động
+      Map<String, String> vouchersMap = {};
+      final selected = voucherController.selectedVoucher.value;
+      if (selected != null) {
+        if (selected.type == 'platform') {
+          vouchersMap['platform'] = selected.code;
+        } else {
+          // apply as store voucher to all stores if applicable, otherwise try to map by seller id
+          if (selected.applicableStores != null && selected.applicableStores!.isNotEmpty) {
+            for (final sid in selected.applicableStores!) {
+              vouchersMap['$sid'] = selected.code;
+            }
+          } else if (selected.id != null && selected.type == 'store') {
+            // fallback: apply to first store in cart that matches voucher.seller
+            for (final sid in storeSubtotals.keys) {
+              vouchersMap[sid] = selected.code;
+            }
+          }
+        }
+      } else {
+        // Chọn voucher tự động nếu có
+        // Ensure shipping fee is calculated so autoApplyBest can evaluate shipping vouchers
+        try {
+          await shippingController.calculateShippingFee();
+        } catch (_) {}
+        vouchersMap = await voucherController.autoApplyBest(storeSubtotals);
+
+        // Reflect auto-applied selection in UI/controllers so user sees selected platform/shipping/store vouchers
+        if (vouchersMap.isNotEmpty) {
+          // platform
+          final pcode = vouchersMap['platform'];
+          if (pcode != null) {
+            final vm = voucherController.vouchers.firstWhereOrNull((v) => v.code == pcode) ?? voucherController.myVouchers.firstWhereOrNull((v) => v.code == pcode);
+            if (vm != null) voucherController.selectedVoucher.value = vm;
+          }
+          // shipping
+          final scode = vouchersMap['shipping'];
+          if (scode != null) {
+            final sm = voucherController.vouchers.firstWhereOrNull((v) => v.code == scode) ?? voucherController.myVouchers.firstWhereOrNull((v) => v.code == scode);
+            if (sm != null) voucherController.selectedShipping.value = sm;
+          }
+          // store vouchers
+          for (final entry in vouchersMap.entries) {
+            final key = entry.key;
+            if (key == 'platform' || key == 'shipping') continue;
+            final code = entry.value;
+            final vm = voucherController.vouchers.firstWhereOrNull((v) => v.code == code) ?? voucherController.myVouchers.firstWhereOrNull((v) => v.code == code);
+            if (vm != null) voucherController.selectedStoreVouchers[key] = vm;
+          }
+          voucherController.selectedStoreVouchers.refresh();
+        }
+      }
+
+      // Include any manually selected store vouchers and shipping voucher
+      // selectedStoreVouchers keys are store ids
+      for (final entry in voucherController.selectedStoreVouchers.entries) {
+        vouchersMap[entry.key] = entry.value.code;
+      }
+      final selectedShipping = voucherController.selectedShipping.value;
+      if (selectedShipping != null) {
+        // Prefer explicit shipping voucher key when voucher type is 'shipping' or it is marked freeship
+        if (selectedShipping.type == 'shipping' || selectedShipping.isFreeShipping == true) {
+          vouchersMap['shipping'] = selectedShipping.code;
+        } else if (selectedShipping.type == 'platform') {
+          // If no platform voucher yet and shipping is platform-type, apply to platform
+          if (!vouchersMap.containsKey('platform')) {
+            vouchersMap['platform'] = selectedShipping.code;
+          } else {
+            // otherwise add as a separate key so backend can inspect it if supports
+            vouchersMap['platform_shipping'] = selectedShipping.code;
+          }
+        } else {
+          // assign to applicable stores or all
+          if (selectedShipping.applicableStores != null && selectedShipping.applicableStores!.isNotEmpty) {
+            for (final sid in selectedShipping.applicableStores!) {
+              vouchersMap['$sid'] = selectedShipping.code;
+            }
+          } else {
+            for (final sid in storeSubtotals.keys) {
+              vouchersMap[sid] = selectedShipping.code;
+            }
+          }
+        }
+      }
+
+      // Reserve các voucher đã chọn để tránh race (unique codes only)
+      final reservedIds = <int>[];
+      final codesToReserve = vouchersMap.values.toSet();
+      for (final code in codesToReserve) {
+        final rid = await voucherController.reserveVoucher(code, seconds: 300);
+        if (rid != null) reservedIds.add(rid);
+      }
+
+      // Determine shipping fee to send. Prefer backend-validated shipping voucher reductions.
+      double shippingFeeToSend = shippingController.shippingFee;
+      // If a shipping-specific voucher was selected/auto-applied, ask backend how much it reduces.
+      if (vouchersMap.containsKey('shipping')) {
+        final scode = vouchersMap['shipping']!;
+        try {
+          final check = await voucherController.checkVoucher(scode, null, target: 'shipping', shippingFee: shippingFeeToSend);
+          if (check != null && check['valid'] == true) {
+            final dam = check['discount_amount'];
+            double reduction = 0.0;
+            if (dam is num) reduction = dam.toDouble(); else reduction = double.tryParse('$dam') ?? 0.0;
+            shippingFeeToSend = (shippingFeeToSend - reduction).clamp(0.0, double.infinity);
+          }
+        } catch (e) {
+          print('Error checking shipping voucher $scode: $e');
+        }
+      } else if (vouchersMap.containsKey('platform')) {
+        // As a fallback, allow platform voucher to reduce shipping only if backend confirms it (target=shipping)
+        final pcode = vouchersMap['platform']!;
+        try {
+          final checkP = await voucherController.checkVoucher(pcode, null, target: 'shipping', shippingFee: shippingFeeToSend);
+          if (checkP != null && checkP['valid'] == true) {
+            final dam = checkP['discount_amount'];
+            double reduction = 0.0;
+            if (dam is num) reduction = dam.toDouble(); else reduction = double.tryParse('$dam') ?? 0.0;
+            shippingFeeToSend = (shippingFeeToSend - reduction).clamp(0.0, double.infinity);
+          }
+        } catch (e) {
+          print('Error checking platform-as-shipping $pcode: $e');
+        }
+      }
+
       final body = {
         "address_id": addressController.selectedAddress.value!.id,
         "payment_method": selectedPaymentMethod.value,
+        "shipping_fee": shippingFeeToSend,
+        "vouchers": vouchersMap,
+        "notes": noteController.text.trim(),
         "return_url_scheme": "myapp://payment-return"
       };
 
@@ -113,6 +255,11 @@ class OrderController extends GetxController {
         },
         body: json.encode(body),
       );
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        // release reservations on failure
+        await voucherController.releaseAllReservations();
+      }
 
       _handleApiResponse(response);
 
@@ -163,6 +310,10 @@ class OrderController extends GetxController {
                 subTitle: 'Đơn hàng COD đã tạo thành công.',
                 onPressed: () {
                   cartController.fetchCart();
+                  // Refresh order list
+                  if (Get.isRegistered<OrderListController>()) {
+                    OrderListController.instance.fetchUserOrders();
+                  }
                   Get.offAll(() => const NavigationMenu());
                 },
               ));
@@ -177,11 +328,88 @@ class OrderController extends GetxController {
   }
 
   void _showError(String message) {
-    Get.rawSnackbar(
-      message: message,
-      backgroundColor: Colors.red,
-      duration: const Duration(seconds: 3),
-      snackPosition: SnackPosition.BOTTOM,
-    );
+    print('❌ OrderController Error: $message');
+  }
+
+  /// Cancel order
+  Future<bool> cancelOrder(int orderId) async {
+    isLoading.value = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null) {
+        print('❌ Cancel order: Not logged in');
+        return false;
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/$orderId/cancel/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Order cancelled successfully');
+        
+        // Refresh order list
+        if (Get.isRegistered<OrderListController>()) {
+          OrderListController.instance.fetchUserOrders();
+        }
+        return true;
+      } else {
+        final error = json.decode(response.body);
+        print('❌ Cancel order failed: ${error['error'] ?? 'Unknown error'}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Cancel order error: $e');
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Confirm order (Shop only)
+  Future<bool> confirmOrder(int orderId) async {
+    isLoading.value = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null) {
+        print('❌ Confirm order: Not logged in');
+        return false;
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/$orderId/confirm/'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        print('✅ Order confirmed successfully');
+        
+        // Refresh order list
+        if (Get.isRegistered<OrderListController>()) {
+          OrderListController.instance.fetchUserOrders();
+        }
+        return true;
+      } else {
+        final error = json.decode(response.body);
+        print('❌ Confirm order failed: ${error['error'] ?? 'Unknown error'}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Confirm order error: $e');
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
   }
 }

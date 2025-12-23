@@ -18,72 +18,59 @@ class ProductAttribute extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    
     final controller = Get.put(VariationController());
     final availableAttributes = controller.getUniqueAttributes(product);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // --- PHẦN 1: Variation (Không hiển thị giá / tồn kho / SKU) ---
-        RoundedContainer(
-          padding: const EdgeInsets.all(AppSizes.md),
-          bgcolor: dark ? AppColors.darkerGrey : AppColors.grey.withOpacity(0.3),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionHeading(title: 'Variation', showActionButton: false),
-              SizedBox(height: AppSizes.spaceBtwItems),
+    if (availableAttributes.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
-              // Chỉ hiển thị dòng này, không có giá / stock
-              Text(
-                "Chọn màu sắc và kích thước sản phẩm",
-                style: TextStyle(fontSize: 13),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Tùy chọn',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
+              const Spacer(),
+              ...availableAttributes.entries.map((entry) {
+                final attributeName = entry.key;
+                final attributeValues = entry.value.toList();
+                return Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Text(
+                    '$attributeName: ${attributeValues.length} loại',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                );
+              }).toList(),
             ],
           ),
-        ),
-
-        const SizedBox(height: AppSizes.spaceBtwItems),
-
-        // --- PHẦN 2: DANH SÁCH THUỘC TÍNH (Color / Size) ---
-        if (availableAttributes.isNotEmpty)
-          ...availableAttributes.entries.map((entry) {
-            final attributeName = entry.key; 
-            final attributeValues = entry.value.toList(); 
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SectionHeading(title: attributeName, showActionButton: false),
-                const SizedBox(height: AppSizes.spaceBtwItems / 2),
-                
-                Obx(() => Wrap(
-                  spacing: 8,
-                  children: attributeValues.map((value) {
-                    final isSelected = controller.selectedAttributes[attributeName] == value;
-                    return MyChoiceChip(
-                      text: value,
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        if (selected) {
-                          controller.onAttributeSelected(product, attributeName, value);
-                        }
-                      },
-                    );
-                  }).toList(),
-                )),
-                const SizedBox(height: AppSizes.spaceBtwItems),
-              ],
-            );
-          }).toList()
-        else 
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Text("Sản phẩm này không có tùy chọn nào."),
+          const SizedBox(height: 8),
+          Text(
+            'Vui lòng chọn tùy chọn sản phẩm',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade600,
+            ),
           ),
-      ],
+        ],
+      ),
     );
   }
 }

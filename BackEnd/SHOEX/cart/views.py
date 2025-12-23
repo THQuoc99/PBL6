@@ -69,7 +69,20 @@ class CartViewSet(viewsets.ViewSet):
     def update_quantity(self, request, pk=None):
         """PATCH /api/cart/{item_id}/update_quantity/ - Sửa số lượng"""
         try:
-            quantity = int(request.data.get('quantity', 1))
+            # Debug logging
+            print(f"Update quantity called - item_id: {pk}, data: {request.data}")
+            
+            # Validate quantity parameter
+            if 'quantity' not in request.data:
+                print(f"ERROR: Missing quantity in request data: {request.data}")
+                return Response({'error': 'Thiếu tham số quantity'}, status=400)
+            
+            try:
+                quantity = int(request.data.get('quantity'))
+            except (ValueError, TypeError) as e:
+                print(f"ERROR: Invalid quantity value: {request.data.get('quantity')}, error: {e}")
+                return Response({'error': 'Quantity phải là số nguyên'}, status=400)
+            
             cart = self.get_cart(request)
             item = CartItem.objects.get(pk=pk, cart=cart)
 
@@ -77,11 +90,15 @@ class CartViewSet(viewsets.ViewSet):
                 item.delete()
             else:
                 # Check tồn kho
+                print(f"Stock check: requested={quantity}, available={item.variant.stock}")
                 if quantity > item.variant.stock:
-                    return Response({'error': f'Chỉ còn {item.variant.stock} sản phẩm'}, status=400)
+                    error_msg = f'Chỉ còn {item.variant.stock} sản phẩm'
+                    print(f"ERROR: {error_msg}")
+                    return Response({'error': error_msg}, status=400)
                 
                 item.quantity = quantity
                 item.save()
+                print(f"Updated successfully: item {pk} -> quantity {quantity}")
             
             # Trả về giỏ hàng mới nhất để update UI
             serializer = CartSerializer(cart)

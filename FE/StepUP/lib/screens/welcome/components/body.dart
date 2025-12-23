@@ -34,7 +34,7 @@ class Body extends StatelessWidget {
                   ),
                   SizedBox(height: size.height * 0.02),
                   const Text(
-                    "Welcome",
+                    "Chào mừng",
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
                   ),
                 ],
@@ -47,7 +47,7 @@ class Body extends StatelessWidget {
             children: [
               // Nút 1: Let's get started -> Chuyển sang ĐĂNG KÝ (SignUpScreen)
               StartButton(
-                text: "Let's get started",
+                text: "Bắt đầu ngay",
                 press: () {
                   Navigator.push(
                     context, 
@@ -59,7 +59,7 @@ class Body extends StatelessWidget {
               
               // Nút 2: I have an account -> Chuyển sang ĐĂNG NHẬP (LoginScreen)
               StartButton(
-                text: "I have an account",
+                text: "Tôi đã có tài khoản",
                 color: Colors.white,
                 textColor: Colors.black,
                 press: () {

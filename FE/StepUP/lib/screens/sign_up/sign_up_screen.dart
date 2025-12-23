@@ -152,49 +152,49 @@ class _BodyState extends State<Body> {
               height: 100,
             ),
             const Text(
-              "SIGN UP",
+              "ĐĂNG KÝ",
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 48),
             ),
             const Text(
-              "Create an account",
+              "Tạo tài khoản mới",
               style: TextStyle(fontSize: 19),
             ),
             const SizedBox(height: 20),
 
             RoundedInputField(
               controller: _usernameController,
-              hintText: "Username",
+              hintText: "Tên đăng nhập",
               onChanged: (value) {},
               icon: Icons.person_outline,
             ),
             RoundedInputField(
               controller: _emailController,
-              hintText: "Your Email",
+              hintText: "Email của bạn",
               onChanged: (value) {},
               icon: Icons.email,
             ),
             RoundedInputField(
               controller: _fullNameController,
-              hintText: "Full Name",
+              hintText: "Họ và tên",
               onChanged: (value) {},
               icon: Icons.badge,
             ),
             RoundedInputField(
               controller: _phoneController,
-              hintText: "Your Phone Number",
+              hintText: "Số điện thoại",
               onChanged: (value) {},
               icon: Icons.phone,
             ),
             RoundedPasswordField(
               controller: _passwordController,
               onChanged: (value) {},
-              hintText: "Password",
+              hintText: "Mật khẩu",
               icon: Icons.lock,
             ),
             RoundedPasswordField(
               controller: _password2Controller,
               onChanged: (value) {},
-              hintText: "Confirm Password",
+              hintText: "Xác nhận mật khẩu",
               icon: Icons.lock_outline,
             ),
             
@@ -203,7 +203,7 @@ class _BodyState extends State<Body> {
             _isLoading
                 ? const CircularProgressIndicator()
                 : StartButton(
-                    text: "SIGN UP",
+                    text: "ĐĂNG KÝ",
                     press: _register, 
                     bsize: Size(size.width * 0.78, 61),
                   ),

@@ -22,6 +22,7 @@ class User(AbstractUser):
     )
     phone = models.CharField(
         max_length=20,
+        unique=True,
         verbose_name="Số điện thoại",
         help_text="Số điện thoại liên hệ"
     )

@@ -3,9 +3,9 @@ from django.conf import settings
 
 class Order(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Chờ thanh toán'),
-        ('paid', 'Đã thanh toán'),
+        ('pending', 'Chờ xác nhận'),
         ('processing', 'Đang xử lý'),
+        ('shipped', 'Đang giao hàng'),
         ('completed', 'Hoàn thành'),
         ('cancelled', 'Đã hủy'),
     ]
@@ -98,6 +98,44 @@ class SubOrder(models.Model):
 
     def __str__(self):
         return f"SubOrder #{self.sub_order_id} - {self.store.name}"
+    
+    def save(self, *args, **kwargs):
+        """Override save để tự động update Order status"""
+        super().save(*args, **kwargs)
+        self._update_parent_order_status()
+    
+    def _update_parent_order_status(self):
+        """Cập nhật trạng thái Order dựa trên SubOrder"""
+        order = self.order
+        sub_orders = order.sub_orders.all()
+        
+        if not sub_orders.exists():
+            return
+        
+        statuses = set(sub_orders.values_list('status', flat=True))
+        new_status = None
+        
+        # All completed
+        if statuses == {'completed'}:
+            new_status = 'completed'
+        # All shipped or completed (at least one shipped)
+        elif statuses.issubset({'shipped', 'completed'}) and 'shipped' in statuses:
+            new_status = 'shipped'
+        # At least one processing
+        elif 'processing' in statuses:
+            new_status = 'processing'
+        # Pending is default, no need to explicitly set
+        
+        if new_status and order.status != new_status:
+            order.status = new_status
+            order.save(update_fields=['status'])
+
+            # Gửi notification khi trạng thái đơn hàng thay đổi
+            from notifications.utils import notify_order_status_update
+            try:
+                notify_order_status_update(order.buyer, order.order_id, new_status)
+            except Exception as e:
+                print(f"Notification Error: {str(e)}")
 
 class OrderItem(models.Model):
     # DB datanew dùng 'item_id', code cũ dùng 'order_item_id'

@@ -33,6 +33,29 @@ class VoucherAdmin(admin.ModelAdmin):
             'fields': ('start_date', 'end_date', 'usage_limit', 'per_user_limit')
         }),
     )
+    
+    def save_model(self, request, obj, form, change):
+        is_new = obj.pk is None
+        super().save_model(request, obj, form, change)
+        
+        # Send notification for new voucher
+        if is_new and obj.is_active:
+            from notifications.utils import notify_platform_voucher, notify_shop_promotion
+            try:
+                from users.models import User
+                all_users = User.objects.filter(is_active=True)[:50]  # Limit for testing
+                
+                if obj.type == 'platform':
+                    # Platform voucher - notify all users
+                    discount_text = f"{obj.discount_value}%" if obj.discount_type == 'percent' else f"{obj.discount_value}đ"
+                    notify_platform_voucher(all_users, obj.code, discount_text)
+                elif obj.type == 'store' and obj.seller:
+                    # Store voucher - notify shop followers
+                    discount_text = f"{obj.discount_value}%" if obj.discount_type == 'percent' else f"{obj.discount_value}đ"
+                    shop_id_int = hash(obj.seller.store_id) % 1000000  # Convert to positive integer
+                    notify_shop_promotion(all_users, shop_id_int, obj.seller.name, f"Giảm {discount_text}", discount_text)
+            except Exception as e:
+                print(f"Voucher notification error: {str(e)}")
 
 @admin.register(UserVoucher)
 class UserVoucherAdmin(admin.ModelAdmin):

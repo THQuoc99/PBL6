@@ -24,59 +24,59 @@ class ProductMetaData extends StatelessWidget {
   Widget build(BuildContext context) {
     final originalPrice = product.price * 1.2;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // --- Price & Sale Tag ---
-        Row(
-          children: [
-            RoundedContainer(
-              radius: AppSizes.sm,
-              bgcolor: AppColors.secondary,
-              padding: const EdgeInsets.symmetric(horizontal: AppSizes.sm, vertical: AppSizes.xs),
-              child: Text(
-                '20%', 
-                style: Theme.of(context).textTheme.labelLarge!.apply(color: Colors.black),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // --- Price Section ---
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '₫${product.price.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
               ),
-            ),
-            const SizedBox(width: AppSizes.spaceBtwItems),
-            
-            Text(
-              '\$${originalPrice.toStringAsFixed(0)}', 
-              style: Theme.of(context).textTheme.titleSmall!.apply(decoration: TextDecoration.lineThrough),
-            ),
-            const SizedBox(width: AppSizes.spaceBtwItems),
-            
-            ProductPriceText(
-              price: product.price.toStringAsFixed(0), 
-              isLarge: true,
-            ),
-          ],
-        ),
-        
-        const SizedBox(height: AppSizes.spaceBtwItems / 1.5),
-        
-        // --- Product Title ---
-        ProductTitleText(title: product.name),
-        
-        const SizedBox(height: AppSizes.spaceBtwItems / 1.5),
-        
-        // --- Stock Status ---
-        Row(
-          children: [
-            const ProductTitleText(title: 'Status'),
-            const SizedBox(width: AppSizes.spaceBtwItems),
-            Text(
-              product.variants.any((v) => v.stock > 0) ? 'In Stock' : 'Out of Stock', 
-              style: Theme.of(context).textTheme.titleMedium
-            ),
-          ],
-        ),
-        
-        const SizedBox(height: AppSizes.spaceBtwItems / 1.5),
-        
-        // --- Store Info ---
-        InkWell(
+              const SizedBox(width: 12),
+              Text(
+                '₫${originalPrice.toStringAsFixed(0)}',
+                style: TextStyle(
+                  fontSize: 14,
+                  decoration: TextDecoration.lineThrough,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: const Text(
+                  '-20%',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // --- Store Info ---
+          InkWell(
           onTap: () {
             // ✅ SỬA LỖI: Dùng storeId thay vì storeName để API tìm được đúng shop
             // Nếu product.storeId rỗng (do dữ liệu cũ), fallback về storeName hoặc báo lỗi
@@ -104,7 +104,9 @@ class ProductMetaData extends StatelessWidget {
             ],
           ),
         ),
-      ],
+          const SizedBox(height: 12),
+        ],
+      ),
     );
   }
 }

@@ -39,7 +39,7 @@ class Body extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               Text(
-                "LOGIN",
+                "ĐĂNG NHẬP",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 52,
@@ -48,7 +48,7 @@ class Body extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                "Welcome Back",
+                "Chào mừng trở lại",
                 style: TextStyle(
                   fontSize: 19,
                   color: Colors.grey[700],
@@ -57,7 +57,7 @@ class Body extends StatelessWidget {
               const SizedBox(height: 30),
               RoundedInputField(
                 controller: usernameController,
-                hintText: "Username",
+                hintText: "Tên đăng nhập",
                 onChanged: (value) {},
                 icon: Icons.person,
               ),
@@ -65,7 +65,7 @@ class Body extends StatelessWidget {
               RoundedPasswordField(
                 controller: passwordController,
                 onChanged: (value) {},
-                hintText: "Password",
+                hintText: "Mật khẩu",
                 icon: Icons.lock,
               ),
               const SizedBox(height: 20),
@@ -75,7 +75,7 @@ class Body extends StatelessWidget {
                 )
               else
                 StartButton(
-                  text: "LOGIN",
+                  text: "ĐĂNG NHẬP",
                   press: onLogin,
                   bsize: Size(size.width * 0.8, 55),
                 ),

@@ -43,7 +43,6 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     "graphene_django",
-    "chatbot",
     "corsheaders", 
     "users",
     "brand",     
@@ -57,6 +56,9 @@ INSTALLED_APPS = [
     "reviews",
     "discount",
     "address",
+    "chatbot",
+    "returns",
+    "notifications",
     'rest_framework',
     'rest_framework_simplejwt',
 ]
@@ -71,8 +73,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'corsheaders.middleware.CorsMiddleware',
 ]
-
-CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'config.urls'
 
@@ -101,10 +101,7 @@ REST_FRAMEWORK = {
     # ...
 }
 
-# GraphQL Configuration
-GRAPHENE = {
-    "SCHEMA": "graphql_api.api.schema",  # Đường dẫn đến schema
-}
+
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 import os
@@ -116,7 +113,7 @@ import os
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'shoex',        # tên database bạn tạo local (vd: shoexdata)
+        'NAME': 'shoex_new',        # tên database bạn tạo local (vd: shoexdata)
         'USER': 'postgres',         # user mặc định PostgreSQL local
         'PASSWORD': 'postgres',# thay bằng mật khẩu bạn đặt khi cài PostgreSQL
         'HOST': 'localhost',        # local database
@@ -160,6 +157,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Media files (User uploaded files)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True # Chỉ dùng trong development
@@ -186,4 +188,15 @@ GRAPHENE = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 import os
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = "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"
+
+# GHTK API Configuration
+GHTK_API_TOKEN = os.environ.get('GHTK_API_TOKEN', '31UD27vahdTHKrYxtrtmp2TNOoorsrtC3IUFFHD')
+
+# Warehouse address for stores without valid address
+WAREHOUSE_ADDRESS = {
+    'province': 'Hà Nội',
+    'district': 'Hoàn Kiếm',
+    'ward': 'Hàng Bạc',
+    'detail': 'Số 1 Phố Hàng Bạc'
+}

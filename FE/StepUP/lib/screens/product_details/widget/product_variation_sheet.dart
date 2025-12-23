@@ -149,19 +149,32 @@ class ProductVariationSheet extends StatelessWidget {
 
                   // Nếu ok -> Thêm vào giỏ
                   cartController.addToCart(variant.id, 1);
+                  
+                  // --- XỬ LÝ SAU KHI THÊM THÀNH CÔNG ---
+                  // Dùng Navigator.pop thay vì Get.back() để tránh LateInitializationError
+                  Navigator.of(context).pop();
+                  
+                  // Delay nhỏ để đảm bảo sheet đã đóng hoàn toàn
+                  Future.delayed(const Duration(milliseconds: 300), () {
+                    if (mode == SheetMode.buyNow) {
+                      Get.to(() => const CartScreen());
+                    } else {
+                      Get.snackbar(
+                        'Thành công', 
+                        'Đã thêm vào giỏ hàng',
+                        snackPosition: SnackPosition.BOTTOM,
+                        backgroundColor: Colors.green.withOpacity(0.9),
+                        colorText: Colors.white,
+                        margin: const EdgeInsets.all(10),
+                        borderRadius: 10,
+                        duration: const Duration(seconds: 2),
+                      );
+                    }
+                  });
                 } else {
                   // Sản phẩm không biến thể
                   _showSnackbar('Thông báo', 'Sản phẩm này không có biến thể');
                   return;
-                }
-
-                // --- XỬ LÝ SAU KHI THÊM THÀNH CÔNG ---
-                Get.back(); // Đóng sheet
-
-                if (mode == SheetMode.buyNow) {
-                  Get.to(() => const CartScreen());
-                } else {
-                  _showSnackbar('Thành công', 'Đã thêm vào giỏ hàng', isSuccess: true);
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -169,7 +182,7 @@ class ProductVariationSheet extends StatelessWidget {
                 padding: const EdgeInsets.all(AppSizes.md),
               ),
               child: Text(
-                mode == SheetMode.buyNow ? 'Buy now' : 'Add to cart',
+                mode == SheetMode.buyNow ? 'Mua ngay' : 'Thêm vào giỏ',
                 style: const TextStyle(color: Colors.white),
               ),
             ),

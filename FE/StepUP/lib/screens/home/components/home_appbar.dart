@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/features/shop/screens/cart/cart.dart';
 import 'package:flutter_app/screens/chatbox/chatbox.dart';
+import 'package:flutter_app/screens/notification/notification_screen.dart';
+import 'package:flutter_app/shop/controllers/notification_controller.dart';
 import 'package:flutter_app/widgets/appbar/appbar.dart';
-import 'package:iconsax_flutter/iconsax_flutter.dart'; // <-- 1. Thêm import
-import 'package:get/get.dart'; // Bỏ comment nếu bạn dùng Get.to
-// import 'package:flutter_app/features/shop/screens/chat/chat_screen.dart'; // Ví dụ đường dẫn
+import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:get/get.dart';
 
 class HomeAppBar extends StatelessWidget {
   const HomeAppBar({
@@ -12,12 +14,16 @@ class HomeAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final notificationController = Get.put(NotificationController());
+    
     return CusAppbar(
+      showCart: true,
+      iconColor: Colors.white,
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start, // Căn lề trái cho title
         children: [
           Text(
-            "Welcome to StepUp",
+            "Xin chào!",
             style: Theme.of(context)
                 .textTheme
                 .headlineMedium!
@@ -42,39 +48,44 @@ class HomeAppBar extends StatelessWidget {
             Get.to(() => const MyChatScreen());
           },
         ),
-
-        // Icon thông báo (đã có)
+        
+        // Icon thông báo 
         Stack(
           children: [
             IconButton(
               icon: const Icon(Icons.notifications, color: Colors.white),
               onPressed: () {
-                // Xử lý khi nhấn vào biểu tượng thông báo
+                Get.to(() => const NotificationScreen());
               },
             ),
-            Positioned(
-              right: 11,
-              top: 11,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                constraints: const BoxConstraints(
-                  minWidth: 14,
-                  minHeight: 14,
-                ),
-                child: const Text(
-                  '3', // Số lượng thông báo chưa đọc
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 8,
+            Obx(() {
+              if (notificationController.unreadCount.value > 0) {
+                return Positioned(
+                  right: 11,
+                  top: 11,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 14,
+                      minHeight: 14,
+                    ),
+                    child: Text(
+                      '${notificationController.unreadCount.value}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            )
+                );
+              }
+              return const SizedBox.shrink();
+            })
           ],
         )
       ],

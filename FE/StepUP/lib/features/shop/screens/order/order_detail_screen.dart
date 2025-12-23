@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter_app/shop/models/order_model.dart';
 import 'package:flutter_app/shop/controllers/order_controller.dart';
+import 'package:flutter_app/features/shop/screens/return/create_return_screen.dart';
+import 'package:flutter_app/features/shop/screens/return/return_list_screen.dart';
 import 'package:flutter_app/constants/colors.dart';
 
 class OrderDetailScreen extends StatelessWidget {
@@ -19,13 +21,22 @@ class OrderDetailScreen extends StatelessWidget {
     final bool showRepayButton = (order.paymentStatus == 'pending' || order.paymentStatus == 'failed') 
                                   && !isCOD 
                                   && order.status != 'cancelled';
+    
+    // Hiển thị button trả hàng nếu order đã hoàn thành, trong 7 ngày, và chưa có return request
+    final bool showReturnButton = order.status == 'completed' 
+                                  && !_isReturnExpired(order)
+                                  && !_hasReturnRequest(order);
+    
+    // Hiển thị nút hủy đơn CHỈ khi pending (người mua có thể tự hủy)
+    // Khi processing thì phải liên hệ shop
+    final bool showCancelButton = order.status == 'pending';
 
     return Scaffold(
       appBar: AppBar(
         title: Text("Đơn hàng #${order.id}"),
         centerTitle: true,
       ),
-      bottomNavigationBar: showRepayButton
+      bottomNavigationBar: (showRepayButton || showReturnButton || showCancelButton)
           ? Container(
               padding: const EdgeInsets.all(16.0),
               decoration: BoxDecoration(
@@ -38,14 +49,51 @@ class OrderDetailScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              child: ElevatedButton(
-                onPressed: () => controller.repayOrder(order),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text("Thanh toán ngay", style: TextStyle(fontSize: 16, color: Colors.white)),
+              child: Row(
+                children: [
+                  if (showCancelButton)
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => _showCancelOrderDialog(context, controller),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text(
+                          "Hủy đơn",
+                          style: TextStyle(fontSize: 16, color: Colors.red),
+                        ),
+                      ),
+                    ),
+                  if (showCancelButton && (showRepayButton || showReturnButton)) const SizedBox(width: 12),
+                  if (showRepayButton)
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => controller.repayOrder(order),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text("Thanh toán ngay", style: TextStyle(fontSize: 16, color: Colors.white)),
+                      ),
+                    ),
+                  if (showRepayButton && showReturnButton) const SizedBox(width: 12),
+                  if (showReturnButton)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => Get.to(() => CreateReturnScreen(order: order)),
+                        icon: const Icon(Iconsax.box_remove),
+                        label: const Text("Trả hàng"),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: AppColors.primary),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             )
           : null,
@@ -58,6 +106,10 @@ class OrderDetailScreen extends StatelessWidget {
             _buildAddressSection(context),
             const SizedBox(height: 20),
             _buildPaymentSection(context, isCOD),
+            if (order.notes != null && order.notes!.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              _buildNotesSection(context),
+            ],
             const SizedBox(height: 20),
             _buildItemsByShopSection(context),
             const SizedBox(height: 20),
@@ -74,21 +126,27 @@ class OrderDetailScreen extends StatelessWidget {
     int currentStep = 0;
     String statusText = "";
     Color statusColor = Colors.blue;
-    String step1Label = isCOD ? "Duyệt đơn" : "Thanh toán";
+    String step1Label = isCOD ? "Xác nhận" : "Thanh toán";
 
     switch (order.status.toLowerCase()) {
       case 'pending':
+        // Pending = chờ xác nhận (COD) hoặc chờ thanh toán (VNPay)
+        currentStep = 0;
         if (isCOD) {
-          currentStep = 1; 
-          statusText = "Đang chuẩn bị hàng";
-          statusColor = Colors.teal;
-        } else {
-          currentStep = 0;
-          statusText = "Chờ thanh toán";
+          statusText = "Chờ shop xác nhận";
           statusColor = Colors.orange;
+        } else {
+          // VNPay/PayPal - check if paid
+          if (order.paymentStatus == 'paid') {
+            statusText = "Đã thanh toán, chờ xác nhận";
+            statusColor = Colors.orange;
+          } else {
+            statusText = "Chờ thanh toán";
+            statusColor = Colors.red;
+          }
         }
         break;
-      case 'paid': 
+      case 'processing':
         currentStep = 1;
         statusText = "Đang chuẩn bị hàng";
         statusColor = Colors.teal;
@@ -100,11 +158,10 @@ class OrderDetailScreen extends StatelessWidget {
         break;
       case 'completed':
         currentStep = 3;
-        statusText = "Giao hàng thành công";
+        statusText = "Đã giao hàng";
         statusColor = Colors.green;
         break;
       case 'cancelled':
-      case 'failed':
         currentStep = -1;
         statusText = "Đã hủy";
         statusColor = Colors.red;
@@ -226,18 +283,30 @@ class OrderDetailScreen extends StatelessWidget {
     Color paymentColor = Colors.orange;
     IconData paymentIcon = Icons.error;
 
-    if (order.status == 'completed' || order.status == 'paid' || order.status == 'shipped' || order.paymentStatus == 'paid') {
+    // Check payment_status, not order status
+    if (order.paymentStatus == 'paid') {
       paymentStatusText = "ĐÃ THANH TOÁN";
       paymentColor = Colors.green;
       paymentIcon = Icons.check_circle;
+    } else if (order.paymentStatus == 'refunded') {
+      paymentStatusText = "ĐÃ HOÀN TIỀN";
+      paymentColor = Colors.purple;
+      paymentIcon = Icons.replay;
     } else if (order.status == 'cancelled') {
       paymentStatusText = "ĐÃ HỦY";
       paymentColor = Colors.grey;
       paymentIcon = Icons.cancel;
     } else if (isCOD) {
-      paymentStatusText = "THANH TOÁN KHI NHẬN";
-      paymentColor = Colors.blue;
-      paymentIcon = Icons.money;
+      // COD and not paid yet
+      if (order.status == 'completed') {
+        paymentStatusText = "ĐÃ THANH TOÁN KHI NHẬN";
+        paymentColor = Colors.green;
+        paymentIcon = Icons.check_circle;
+      } else {
+        paymentStatusText = "THANH TOÁN KHI NHẬN";
+        paymentColor = Colors.blue;
+        paymentIcon = Icons.money;
+      }
     }
 
     return Card(
@@ -324,15 +393,30 @@ class OrderDetailScreen extends StatelessWidget {
                     children: [
                       // Ảnh sản phẩm
                       Container(
-                        width: 60, height: 60,
+                        width: 60, 
+                        height: 60,
                         decoration: BoxDecoration(
                           color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(8),
-                          image: item.productImage != null 
-                              ? DecorationImage(image: NetworkImage(item.productImage!), fit: BoxFit.cover)
-                              : null
                         ),
-                        child: item.productImage == null ? const Icon(Iconsax.image, color: Colors.grey) : null,
+                        child: item.productImage != null 
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  item.productImage!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(Iconsax.image, color: Colors.grey);
+                                  },
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const Center(
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    );
+                                  },
+                                ),
+                              )
+                            : const Icon(Iconsax.image, color: Colors.grey),
                       ),
                       const SizedBox(width: 12),
                       
@@ -378,19 +462,19 @@ class OrderDetailScreen extends StatelessWidget {
 
   // 5. Widget Tổng tiền đơn hàng
   Widget _buildTotalSection(BuildContext context) {
-    double shippingFee = 0.0; 
-    double total = order.totalAmount + shippingFee;
+    // Calculate subtotal (total - shipping fee)
+    double subtotal = order.totalAmount - order.shippingFee;
     return Card(
       elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _detailRow("Tạm tính", "\$${order.totalAmount.toStringAsFixed(0)}"),
+            _detailRow("Tạm tính", "\$${subtotal.toStringAsFixed(0)}"),
             const SizedBox(height: 8),
-            _detailRow("Phí vận chuyển", "\$0"), 
+            _detailRow("Phí vận chuyển", "\$${order.shippingFee.toStringAsFixed(0)}"), 
             const Divider(height: 24),
-            _detailRow("Tổng cộng", "\$${total.toStringAsFixed(0)}", isBold: true, fontSize: 18, color: AppColors.primary),
+            _detailRow("Tổng cộng", "\$${order.totalAmount.toStringAsFixed(0)}", isBold: true, fontSize: 18, color: AppColors.primary),
           ],
         ),
       ),
@@ -404,5 +488,81 @@ class OrderDetailScreen extends StatelessWidget {
 
   Widget _detailRow(String label, String value, {bool isBold = false, double fontSize = 14, Color? color}) {
     return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text(label, style: const TextStyle(color: Colors.grey)), Text(value, style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal, fontSize: fontSize, color: color ?? Colors.black))]);
+  }
+
+  // Helper: Check if return period expired (7 days)
+  bool _isReturnExpired(OrderModel order) {
+    // Check theo orderDate (ngày đặt hàng)
+    final now = DateTime.now();
+    final difference = now.difference(order.orderDate).inDays;
+    
+    return difference > 7; // 7 ngày kể từ khi đặt hàng
+  }
+
+  // Helper: Check if order already has return request
+  bool _hasReturnRequest(OrderModel order) {
+    return order.hasReturnRequest;
+  }
+
+  // Notes section
+  Widget _buildNotesSection(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionHeader(Iconsax.note_1, "Ghi chú đơn hàng"),
+            const SizedBox(height: 10),
+            Text(
+              order.notes ?? '',
+              style: const TextStyle(fontSize: 14, height: 1.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Show cancel order dialog
+  void _showCancelOrderDialog(BuildContext context, OrderController controller) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hủy đơn hàng'),
+        content: const Text('Bạn có chắc chắn muốn hủy đơn hàng này?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Không'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final success = await controller.cancelOrder(order.id);
+              
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(success ? 'Đã hủy đơn hàng thành công' : 'Đơn hàng đang được xử lý. Vui lòng liên hệ shop để yêu cầu hủy đơn'),
+                    backgroundColor: success ? Colors.green : Colors.red,
+                  ),
+                );
+              }
+              
+              if (success) {
+                Get.back();
+              }
+            },
+            child: const Text(
+              'Hủy đơn',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

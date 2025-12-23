@@ -14,6 +14,11 @@ class CartItemModel {
   final Map<String, dynamic> attributes;
   final Map<String, String> selectedVariation;
   
+  // Store info for shipping calculation
+  final String? storeId;
+  final String? storeName;
+  final Map<String, dynamic>? storeAddress;
+  
   // Biến trạng thái UI (GetX)
   RxBool isSelected = true.obs; 
 
@@ -28,6 +33,9 @@ class CartItemModel {
     this.image,
     required this.attributes,
     required this.selectedVariation,
+    this.storeId,
+    this.storeName,
+    this.storeAddress,
     bool selected = true,
   }) {
     isSelected.value = selected;
@@ -57,6 +65,13 @@ class CartItemModel {
       attributes: json['attributes'] is Map 
           ? Map<String, dynamic>.from(json['attributes']) 
           : {},
+      
+      // Store info
+      storeId: json['store_id'],
+      storeName: json['store_name'],
+      storeAddress: json['store_address'] is Map 
+          ? Map<String, dynamic>.from(json['store_address'])
+          : null,
     );
   }
 

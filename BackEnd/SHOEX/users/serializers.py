@@ -1,4 +1,7 @@
 from rest_framework import serializers
+import re
+from django.core.validators import validate_email as django_validate_email
+from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import User
 from django.contrib.auth.password_validation import validate_password
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -6,6 +9,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
+        
         
         # Trả về thêm avatar url trong token response nếu cần
         avatar_url = None
@@ -46,12 +50,54 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             'full_name', 'phone', 'role', 'birth_date' 
         )
 
+    def validate_username(self, value):
+        """Kiểm tra username đã tồn tại chưa"""
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Tên đăng nhập này đã tồn tại.")
+        return value
+
+    def validate_email(self, value):
+        """Kiểm tra định dạng email và đã được đăng ký chưa"""
+        # normalize
+        if value:
+            value = value.strip().lower()
+
+        # format check using Django validator
+        try:
+            django_validate_email(value)
+        except DjangoValidationError:
+            raise serializers.ValidationError("Email không đúng định dạng.")
+
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Email này đã được đăng ký.")
+        return value
+
+    def validate_phone(self, value):
+        """Kiểm tra định dạng số điện thoại và đã được đăng ký chưa.
+
+        Hỗ trợ định dạng quốc gia cơ bản: chỉ cho phép số, có thể có dấu + ở đầu, độ dài 7..15.
+        """
+        if not value:
+            raise serializers.ValidationError("Số điện thoại không được để trống.")
+
+        phone = value.strip()
+        # VN mobile regex: starts with +84 or 0, then operator 3/5/7/8/9, then 8 digits
+        if not re.match(r'^(?:\+84|0)(?:3|5|7|8|9)\d{8}$', phone):
+            raise serializers.ValidationError("Số điện thoại không đúng định dạng Việt Nam.")
+
+        if User.objects.filter(phone=phone).exists():
+            raise serializers.ValidationError("Số điện thoại này đã được đăng ký.")
+        return phone
+
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({"password": "Mật khẩu xác nhận không khớp."})
         
         if 'role' not in attrs or not attrs['role']:
              attrs['role'] = 'buyer'
+        # normalize email if present
+        if 'email' in attrs and attrs['email']:
+            attrs['email'] = attrs['email'].strip().lower()
              
         return attrs
 
@@ -93,3 +139,17 @@ class UserProfileSerializer(serializers.ModelSerializer):
         if user and User.objects.filter(email=value).exclude(pk=user.pk).exists():
             raise serializers.ValidationError("Email này đã được sử dụng bởi tài khoản khác.")
         return value
+
+    def validate_phone(self, value):
+        user = self.instance
+        # Kiểm tra trùng số điện thoại khi update
+        if not value:
+            raise serializers.ValidationError("Số điện thoại không được để trống.")
+
+        phone = value.strip()
+        if not re.match(r'^(?:\+84|0)(?:3|5|7|8|9)\d{8}$', phone):
+            raise serializers.ValidationError("Số điện thoại không đúng định dạng Việt Nam.")
+
+        if user and User.objects.filter(phone=phone).exclude(pk=user.pk).exists():
+            raise serializers.ValidationError("Số điện thoại này đã được sử dụng bởi tài khoản khác.")
+        return phone

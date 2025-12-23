@@ -17,7 +17,7 @@ class BillingAddressSection extends StatelessWidget{
       children: [
         SectionHeading(
             title: 'Shipping Address', 
-            buttonTitle: 'Change', 
+            buttonTitle: 'Thay đổi', 
             onButtonPressed: () => Get.to(() => const UserAddressScreen())
         ),
         

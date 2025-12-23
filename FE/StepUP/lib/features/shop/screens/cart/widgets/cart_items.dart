@@ -18,7 +18,8 @@ class CartItems extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final controller = Get.find<CartController>();
+    // Sử dụng Get.put để đảm bảo controller được khởi tạo nếu chưa có
+    final controller = Get.put(CartController());
 
     return Obx(() {
       // Lọc danh sách item cần hiển thị
@@ -52,7 +53,7 @@ class CartItems extends StatelessWidget {
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
                   icon: Icons.delete,
-                  label: 'Delete',
+                  label: 'Xóa',
                   borderRadius: BorderRadius.circular(AppSizes.cardRadiusMd),
                 ),
               ],

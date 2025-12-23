@@ -16,18 +16,20 @@ class SearchController extends GetxController {
 
   // Hàm tìm kiếm
   Future<void> searchProducts(String query) async {
-    if (query.isEmpty) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
       searchResults.clear();
+      searchText.value = '';
       return;
     }
 
-    searchText.value = query;
+    searchText.value = trimmed;
     isLoading.value = true;
 
     try {
-      // Gọi API với tham số search (Tùy backend của bạn cấu hình filter như nào)
-      // Ví dụ Django Rest Framework thường dùng ?search=
-      final response = await http.get(Uri.parse('$baseUrl/?search=$query')); 
+      // Encode query to avoid URL issues
+      final encoded = Uri.encodeQueryComponent(trimmed);
+      final response = await http.get(Uri.parse('$baseUrl/?search=$encoded'));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(utf8.decode(response.bodyBytes));

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/constants/colors.dart';
-import 'package:flutter_app/constants/image_string.dart';
 import 'package:flutter_app/constants/sizes.dart';
 import 'package:flutter_app/screens/home/components/curved_edges_widget.dart';
 import 'package:flutter_app/widgets/appbar/appbar.dart';
@@ -11,7 +10,7 @@ import 'package:flutter_app/shop/models/product_model.dart';
 import 'package:get/get.dart';
 import 'package:flutter_app/shop/controllers/wishlist_controller.dart';
 
-class ProductSlider extends StatelessWidget {
+class ProductSlider extends StatefulWidget {
   final ProductModel product;
 
   const ProductSlider({
@@ -19,22 +18,24 @@ class ProductSlider extends StatelessWidget {
     required this.product,
   });
 
-  String _getImageUrl(String? img) {
-    if (img == null || img.isEmpty) return AppImages.sabrina;
-    String url = img;
-    if (url.startsWith('/media')) {
-      return 'http://10.0.2.2:8000$url';
-    }
-    return url;
+  @override
+  State<ProductSlider> createState() => _ProductSliderState();
+}
+
+class _ProductSliderState extends State<ProductSlider> {
+  int selectedImageIndex = 0; // Track selected image index
+
+  String _getImageUrl([int index = 0]) {
+    // Ảnh được lưu ở: media/products/{productId}/{productId}_{index}.jpg
+    return 'http://10.0.2.2:8000/media/products/${widget.product.id}/${widget.product.id}_$index.jpg';
   }
 
   @override
   Widget build(BuildContext context) {
-    // ✅ KHỞI TẠO CONTROLLER
     final wishlistController = Get.put(WishlistController());
     
-    final mainImage = _getImageUrl(product.image);
-    final isNetworkImage = mainImage.startsWith('http');
+    final mainImage = _getImageUrl(selectedImageIndex);
+    final isNetworkImage = true; // Luôn là network image từ media folder
 
     return CurvedEdgeWidget(
       child: Container(
@@ -47,13 +48,15 @@ class ProductSlider extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(AppSizes.productImageRadius * 2),
                 child: Center(
-                  child: isNetworkImage
-                      ? Image.network(
-                          mainImage,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported, size: 80, color: Colors.grey),
-                        )
-                      : Image.asset(mainImage, fit: BoxFit.contain),
+                  child: Image.network(
+                    mainImage,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.image_not_supported, 
+                      size: 80, 
+                      color: Colors.grey,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -66,18 +69,31 @@ class ProductSlider extends StatelessWidget {
               child: SizedBox(
                 height: 80,
                 child: ListView.separated(
-                  itemCount: 4,
+                  itemCount: 5, // 5 thumbnails: _0.jpg to _4.jpg
                   shrinkWrap: true,
                   scrollDirection: Axis.horizontal,
                   separatorBuilder: (_, __) => const SizedBox(width: AppSizes.spaceBtwItems),
                   itemBuilder: (_, index) {
-                    return RoundedImage(
-                      width: 80,
-                      bgcolor: Colors.white,
-                      border: Border.all(color: AppColors.primary),
-                      padding: const EdgeInsets.all(AppSizes.sm),
-                      imageUrl: mainImage,
-                      isNetworkImage: isNetworkImage,
+                    final thumbnailUrl = _getImageUrl(index);
+                    final isSelected = selectedImageIndex == index;
+                    
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          selectedImageIndex = index;
+                        });
+                      },
+                      child: RoundedImage(
+                        width: 80,
+                        bgcolor: Colors.white,
+                        border: Border.all(
+                          color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                          width: isSelected ? 2 : 1,
+                        ),
+                        padding: const EdgeInsets.all(AppSizes.sm),
+                        imageUrl: thumbnailUrl,
+                        isNetworkImage: isNetworkImage,
+                      ),
                     );
                   },
                 ),
@@ -90,11 +106,11 @@ class ProductSlider extends StatelessWidget {
               actions: [
                 // Sử dụng Obx để lắng nghe thay đổi từ WishlistController
                 Obx(() {
-                  final isFavorite = wishlistController.isFavorite(product.id);
+                  final isFavorite = wishlistController.isFavorite(widget.product.id);
                   return CircularIcon(
                     icon: isFavorite ? Iconsax.heart : Iconsax.heart,
                     color: isFavorite ? Colors.red : Colors.grey,
-                    onpress: () => wishlistController.toggleFavorite(product),
+                    onpress: () => wishlistController.toggleFavorite(widget.product),
                   );
                 })
               ],

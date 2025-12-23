@@ -19,16 +19,11 @@ class FavoriteScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: CusAppbar(
+        showCart: true,
         title: Text(
           'Danh sách yêu thích',
           style: Theme.of(context).textTheme.headlineMedium,
         ),
-        actions: [
-          CircularIcon(
-            icon: Iconsax.add,
-            onpress: () => Get.to(() => const HomeScreen()),
-          )
-        ],
       ),
       body: SingleChildScrollView(
         child: Padding(

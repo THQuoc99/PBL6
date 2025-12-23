@@ -9,6 +9,7 @@ class Voucher(models.Model):
     TYPE_CHOICES = [
         ('platform', 'Platform'),
         ('store', 'Store'), # Đổi từ 'seller' sang 'store' cho đúng ngữ cảnh mới
+        ('shipping', 'Shipping'),
     ]
     
     DISCOUNT_TYPE_CHOICES = [
@@ -84,7 +85,8 @@ class Voucher(models.Model):
         verbose_name="Giới hạn mỗi user"
     )
     is_active = models.BooleanField(default=True, verbose_name="Kích hoạt")
-    is_auto = models.BooleanField(default=False, verbose_name="Tự động áp dụng")
+    is_auto = models.BooleanField(default=False, verbose_name="Tự động áp")
+    is_free_shipping = models.BooleanField(default=False, verbose_name="Miễn phí vận chuyển")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -102,6 +104,8 @@ class Voucher(models.Model):
             raise ValidationError("Store voucher phải thuộc về một cửa hàng cụ thể.")
         if self.type == 'platform' and self.seller:
             raise ValidationError("Platform voucher không được gán cho cửa hàng.")
+        if self.type == 'shipping' and self.seller:
+            raise ValidationError("Shipping voucher không được gán cho cửa hàng.")
         if self.end_date <= self.start_date:
             raise ValidationError("Ngày kết thúc phải sau ngày bắt đầu.")
 
@@ -216,3 +220,38 @@ class OrderVoucher(models.Model):
     )
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2)
     applied_at = models.DateTimeField(auto_now_add=True)
+
+
+class VoucherReservation(models.Model):
+    """Đặt giữ voucher tạm thời cho user trong quá trình checkout
+
+    Nếu user không hoàn tất đặt hàng trong thời gian `expires_at`, reservation nên được
+    dọn dẹp (cron/job) hoặc user có thể gọi `release` để trả lại voucher.
+    """
+    reservation_id = models.AutoField(primary_key=True)
+    voucher = models.ForeignKey(Voucher, on_delete=models.CASCADE, related_name='reservations')
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='voucher_reservations')
+    reserved_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "Voucher Reservation"
+        verbose_name_plural = "Voucher Reservations"
+
+
+class VoucherUsage(models.Model):
+    """Ghi nhận số lần một user đã sử dụng một voucher.
+
+    Dùng để giới hạn `per_user_limit` một cách chắc chắn (không phụ thuộc vào việc
+    người dùng có lưu voucher trong ví hay không).
+    """
+    id = models.AutoField(primary_key=True)
+    voucher = models.ForeignKey(Voucher, on_delete=models.CASCADE, related_name='usages')
+    user = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='voucher_usages')
+    used_count = models.IntegerField(default=0)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ['voucher', 'user']
+        verbose_name = 'Voucher Usage'
+        verbose_name_plural = 'Voucher Usages'
