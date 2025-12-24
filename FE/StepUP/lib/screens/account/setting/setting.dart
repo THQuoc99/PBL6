@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:flutter_app/features/personalization/screens/address/address.dart';
 import 'package:flutter_app/screens/account/profile/profile.dart';
-import 'package:flutter_app/screens/account/profile/edit_profile_screen.dart';
 import 'package:flutter_app/screens/notification/notification_screen.dart';
 import 'package:flutter_app/screens/account/voucher/voucher_screen.dart';
 import 'package:flutter_app/screens/account/security/security_screen.dart';
@@ -18,7 +17,8 @@ import 'package:flutter_app/widgets/appbar/appbar.dart';
 import 'package:flutter_app/shop/services/auth_service.dart';
 import 'package:flutter_app/screens/login/login_screen.dart';
 import 'package:flutter_app/shop/controllers/user_controller.dart';
-import 'package:flutter_app/features/shop/screens/cart/cart.dart';
+
+import 'package:flutter_app/screens/welcome/welcome_screen.dart';
 class SettingScreen extends StatelessWidget {
   const SettingScreen({super.key});
 
@@ -202,7 +202,7 @@ class SettingScreen extends StatelessWidget {
                         if (shouldLogout == true) {
                           try {
                             await authService.logout();
-                            Get.offAll(() => const LoginScreen());
+                            Get.offAll(() => const WelcomeScreen());
                           } catch (e) {
                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Không thể đăng xuất: $e')));
                           }
