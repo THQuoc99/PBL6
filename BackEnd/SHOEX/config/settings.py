@@ -12,7 +12,24 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
+#  GHTK
+GHTK_API_TOKEN = os.getenv("GHTK_API_TOKEN")
+GHTK_PARTNER_CODE = os.getenv("GHTK_PARTNER_CODE")
+GHTK_BASE_URL = os.getenv(
+    "GHTK_BASE_URL",
+    "https://services.giaohangtietkiem.vn"
+)
+# PAYMENT- VNPAY
+VNP_URL =os.getenv("VNP_URL", "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html")
+VNP_TMN_CODE =os.getenv("VNP_TMN_CODE")
+VNP_HASH_SECRET =os.getenv("VNP_HASH_SECRET")
+VNP_RETURN_URL =os.getenv("VNP_RETURN_URL", "https://m2smm85s-3000.asse.devtunnels.ms/api/payment/vnpay/return")
+VNP_IPN_URL =os.getenv("VNP_IPN_URL","https://m2smm85s-3000.asse.devtunnels.ms/api/payment/vnpay/ipn")
+VNP_RETURN_URL_STORE=os.getenv("VNP_RETURN_URL_STORE","https://m2smm85s-3000.asse.devtunnels.ms/seller/dashboard")
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 AUTH_USER_MODEL = "users.User"
@@ -32,6 +49,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Application definition
 
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -42,7 +60,6 @@ INSTALLED_APPS = [
     'corsheaders',  # Thêm CORS support
     "graphene_django",
     "graphene_file_upload",  # Thêm để support file upload trong GraphQL
-    "chatbot", 
     "users",     
     "store",     # Thêm app store
     "products",   
@@ -55,6 +72,7 @@ INSTALLED_APPS = [
     "discount",
     "address",
     "brand",
+    "settlements",
 ]
 
 MIDDLEWARE = [
@@ -64,6 +82,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'config.jwt_middleware.JWTAuthenticationMiddleware',  # JWT Authentication
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -141,7 +160,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Ho_Chi_Minh'
 
 USE_I18N = True
 
@@ -160,7 +179,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS Configuration - Cho phép frontend truy cập
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Next.js default port
+    "http://localhost:3000",  # Next.js frontend
     "http://127.0.0.1:3000",
 ]
 
@@ -180,3 +199,11 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
 ]
+
+# Session settings for cross-domain support
+SESSION_COOKIE_SAMESITE = 'Lax'  # Lax cho phép cookies từ localhost và 127.0.0.1
+SESSION_COOKIE_SECURE = False  # Set True if using HTTPS
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_DOMAIN = None  # None để hỗ trợ cả localhost và 127.0.0.1
+SESSION_SAVE_EVERY_REQUEST = True  # Ensure session is saved on each request
+

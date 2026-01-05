@@ -10,7 +10,7 @@ from .models import (
 class StoreAdmin(admin.ModelAdmin):
     list_display = ('store_id', 'name', 'rating', 'total_reviews', 'followers_count', 'is_verified', 'status', 'created_at')
     list_filter = ('status', 'is_verified', 'is_active', 'created_at')
-    search_fields = ('store_id', 'name', 'email', 'phone')
+    search_fields = ('store_id', 'name', 'email')
     readonly_fields = ('rating', 'total_reviews', 'followers_count', 'products_count', 'total_sales', 'total_revenue', 'created_at', 'updated_at')
     ordering = ('-created_at',)
     
@@ -19,7 +19,7 @@ class StoreAdmin(admin.ModelAdmin):
             'fields': ('store_id', 'name', 'slug', 'description')
         }),
         ('Liên hệ', {
-            'fields': ('email', 'phone', 'address', 'location')
+            'fields': ('email', 'address', 'location')
         }),
         ('Hình ảnh', {
             'fields': ('avatar', 'cover_image', 'logo')
@@ -50,7 +50,20 @@ class StoreUserAdmin(admin.ModelAdmin):
     autocomplete_fields = ['store', 'user', 'invited_by']
     readonly_fields = ('created_at', 'updated_at')
 
+from .models import AddressStore  # Thêm vào import
 
+@admin.register(AddressStore)
+class AddressStoreAdmin(admin.ModelAdmin):
+    list_display = ('address_id', 'store', 'full_address', 'is_default')
+    list_filter = ('is_default', 'province', 'ward')
+    search_fields = ('store__name', 'province', 'ward', 'hamlet', 'detail')
+    autocomplete_fields = ['store']
+    def save_model(self, request, obj, form, change):
+        if obj.is_default:
+            others = AddressStore.objects.filter(store=obj.store, is_default=True).exclude(address_id=obj.address_id)
+            if others.exists():
+                self.message_user(request, "Các địa chỉ mặc định khác sẽ tự động bị bỏ chọn.", level='warning')
+        super().save_model(request, obj, form, change)
 @admin.register(StoreCategory)
 class StoreCategoryAdmin(admin.ModelAdmin):
     list_display = ('store', 'category', 'is_primary', 'created_at')

@@ -7,7 +7,6 @@ interface ProductsPageProps {
   products: Product[];
   setProducts: (products: Product[]) => void;
 }
-
 // Helper function to generate unique ID
 const uid = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 

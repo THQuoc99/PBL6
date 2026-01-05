@@ -16,7 +16,19 @@ class Address(models.Model):
         verbose_name="Người dùng",
         help_text="Người dùng sở hữu địa chỉ này"
     )
-    
+    name = models.CharField(
+        max_length=255,
+        verbose_name="Tên người nhận",
+        null=True,
+        help_text="Tên người nhận hàng tại địa chỉ này"
+    )
+    phone_number = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        verbose_name="Số điện thoại",
+        help_text="Số điện thoại liên hệ kèm theo địa chỉ"
+    )
     province = models.CharField(
         max_length=100,
         verbose_name="Tỉnh/Thành phố",

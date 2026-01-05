@@ -100,7 +100,10 @@ class UserQuery(ObjectType):
     group_count = Int()
     
     # User profile
-    user_profile = Field(UserProfileType, user_id=ID())
+    user_profile = Field(
+        UserProfileType, 
+        description="Lấy user profile của user đang đăng nhập"
+    )
 
     # def resolve_user(self, info, id):
     #     """Lấy user theo ID"""
@@ -209,20 +212,14 @@ class UserQuery(ObjectType):
         """Tổng số groups"""
         return Group.objects.count()
 
-    def resolve_user_profile(self, info, user_id=None):
-        """Lấy user profile"""
-        if user_id:
-            try:
-                user = User.objects.get(id=user_id)
-                return UserProfileType(user=user)
-            except User.DoesNotExist:
-                return None
-        else:
-            # Return current user profile
-            user = info.context.user
-            if user.is_authenticated:
-                return UserProfileType(user=user)
-        return None
+    def resolve_user_profile(self, info):
+        """Lấy user profile của user đang đăng nhập"""
+        user = info.context.user
+        
+        if not user or not user.is_authenticated:
+            return None
+            
+        return UserProfileType(user=user)
 
 
 class UserMutation(ObjectType):

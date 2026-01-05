@@ -14,7 +14,6 @@ class Cart(models.Model):
         primary_key=True,
         verbose_name="Mã giỏ hàng"
     )
-    
     # User - có thể null cho guest user
     user = models.OneToOneField(
         User,

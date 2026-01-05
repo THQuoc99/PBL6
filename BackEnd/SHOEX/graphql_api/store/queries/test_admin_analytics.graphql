@@ -1,0 +1,38 @@
+# Test GraphQL query for Admin Analytics
+
+query TestAdminAnalytics {
+  adminAnalytics(range: "30d", limit: 12) {
+    revenueTrend {
+      month
+      revenue
+      orders
+      growth
+    }
+    categoryPerformance {
+      name
+      sales
+      orders
+    }
+    regionalDistribution {
+      region
+      value
+    }
+    userGrowth {
+      month
+      customers
+      sellers
+    }
+  }
+}
+
+# Test with different ranges
+query TestAdminAnalytics90d {
+  adminAnalytics(range: "90d", limit: 12) {
+    revenueTrend {
+      month
+      revenue
+      orders
+      growth
+    }
+  }
+}

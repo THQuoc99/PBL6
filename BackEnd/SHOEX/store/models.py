@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.db import transaction
 
 User = get_user_model()
 
@@ -38,12 +39,6 @@ class Store(models.Model):
         max_length=255,
         blank=True,
         verbose_name="Email liên hệ"
-    )
-    
-    phone = models.CharField(
-        max_length=20,
-        blank=True,
-        verbose_name="Số điện thoại"
     )
     
     address = models.TextField(
@@ -887,7 +882,12 @@ class AddressStore(models.Model):
         verbose_name="Địa chỉ mặc định",
         help_text="Đánh dấu là địa chỉ mặc định của cửa hàng"
     )
-
+    phone = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        verbose_name="Số điện thoại"
+    )
     class Meta:
         verbose_name = "Địa chỉ cửa hàng"
         verbose_name_plural = "Địa chỉ cửa hàng"
@@ -916,16 +916,19 @@ class AddressStore(models.Model):
         ])
         return ", ".join(parts)
 
+
+
     def save(self, *args, **kwargs):
         """Override save để đảm bảo chỉ có 1 địa chỉ mặc định per store"""
-        if self.is_default:
-            AddressStore.objects.filter(
-                store=self.store,
-                is_default=True
-            ).exclude(
-                address_id=self.address_id
-            ).update(is_default=False)
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            if self.is_default:
+                AddressStore.objects.filter(
+                    store=self.store,
+                    is_default=True
+                ).exclude(
+                    address_id=self.address_id
+                ).update(is_default=False)
+            super().save(*args, **kwargs)
 
     def set_as_default(self):
         """Đặt địa chỉ này làm mặc định"""

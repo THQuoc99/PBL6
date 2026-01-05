@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Menu, X, Heart, ShoppingCart, User, Home, Package, Store, Tag, Truck, Star, LogOut, Phone } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../hooks/uses/useAuth';
 import { authService } from '../../services/auth';
 
 interface CustomerLayoutProps {
@@ -12,10 +12,10 @@ interface CustomerLayoutProps {
 export default function CustomerLayout({ children, currentPage, onNavigate }: CustomerLayoutProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user,logout } = useAuth();
 
   const handleLogout = () => {
-    authService.logout();
+    logout();
     onNavigate?.('login');
   };
 

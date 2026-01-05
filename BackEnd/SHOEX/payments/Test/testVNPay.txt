@@ -1,0 +1,121 @@
+II. QUY TRÌNH TỪ ĐẦU ĐẾN CUỐI
+Bước 1 — Backend tạo link thanh toán
+
+Backend tạo URL như:
+
+https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?vnp_Amount=...
+
+
+→ Sau đó trả về cho frontend.
+
+Code Python chuẩn để tạo URL
+import hashlib
+import urllib.parse
+from datetime import datetime
+
+VNP_URL = "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+VNP_TMN_CODE = "QEMYILKB"
+VNP_HASH_SECRET = "GQKESI6GKMJR78AAJZFL3PBXYC7263SD"
+RETURN_URL = "https://m2smm85s-3000.asse.devtunnels.ms/api/payment/vnpay/return"
+
+def hmac_sha512(key, data):
+    return hashlib.sha512((key + data).encode("utf-8")).hexdigest()
+
+def create_payment_url(order_id, amount):
+    params = {
+        "vnp_Version": "2.1.0",
+        "vnp_Command": "pay",
+        "vnp_TmnCode": VNP_TMN_CODE,
+        "vnp_Amount": amount * 100,  
+        "vnp_CurrCode": "VND",
+        "vnp_TxnRef": str(order_id),
+        "vnp_OrderInfo": f"Thanh toan don hang {order_id}",
+        "vnp_OrderType": "other",
+        "vnp_Locale": "vn",
+        "vnp_ReturnUrl": RETURN_URL,
+        "vnp_IpAddr": "127.0.0.1",
+        "vnp_CreateDate": datetime.now().strftime("%Y%m%d%H%M%S"),
+    }
+
+    sorted_params = sorted(params.items())
+    query_string = "&".join([f"{k}={v}" for k, v in sorted_params])
+
+    checksum = hmac_sha512(VNP_HASH_SECRET, query_string)
+    full_url = f"{VNP_URL}?{query_string}&vnp_SecureHash={checksum}"
+    return full_url
+
+Bước 2 — Frontend redirect sang VNPAY
+
+Frontend nhận URL rồi redirect:
+
+window.location.href = paymentUrl;
+
+Bước 3 — VNPAY chuyển hướng về Return URL
+
+Sau khi thanh toán xong, khách bị đưa về:
+
+/api/payment/vnpay/return?vnp_Amount=...&vnp_ResponseCode=...
+
+
+Return URL dùng để hiển thị kết quả cho người dùng (không dùng để xác nhận thật).
+
+Code Python Return URL
+@app.route("/api/payment/vnpay/return", methods=["GET"])
+def vnpay_return():
+    data = request.args.to_dict()
+
+    if data.get("vnp_ResponseCode") == "00":
+        return "Thanh toán thành công (Return URL)"
+    else:
+        return "Thanh toán thất bại (Return URL)"
+
+Bước 4 — VNPAY gửi IPN URL để xác nhận thật
+
+Đây mới là bước backend phải xử lý để cập nhật đơn hàng.
+
+VNPAY gửi request server → server xác thực hash → server trả về:
+
+{ "RspCode": "00", "Message": "Confirm Success" }
+
+Code Python IPN URL
+@app.route("/api/payment/vnpay/ipn", methods=["GET"])
+def vnpay_ipn():
+    params = request.args.to_dict()
+    vnp_secure_hash = params.pop("vnp_SecureHash", None)
+    params.pop("vnp_SecureHashType", None)
+
+    sorted_params = sorted(params.items())
+    query_string = "&".join([f"{k}={v}" for k, v in sorted_params])
+    my_hash = hmac_sha512(VNP_HASH_SECRET, query_string)
+
+    if my_hash != vnp_secure_hash:
+        return jsonify({"RspCode": "97", "Message": "Checksum invalid"})
+
+    if params.get("vnp_ResponseCode") == "00":
+        print(">>> Đơn hàng đã thanh toán thành công.")
+        # TODO: cập nhật đơn hàng PAID
+    else:
+        print(">>> Thanh toán thất bại.")
+
+    return jsonify({"RspCode": "00", "Message": "Confirm Success"})
+
+III. TÓM TẮT NGẮN GỌN THEO ĐÚNG YÊU CẦU CỦA BẠN
+
+Bạn tự tạo 2 URL:
+
+Return: /api/payment/vnpay/return
+
+IPN: /api/payment/vnpay/ipn
+
+Nhập chúng vào trang cấu hình Sandbox
+https://sandbox.vnpayment.vn
+
+Backend tạo URL thanh toán → redirect người dùng sang VNPAY
+
+Khi thanh toán xong:
+
+User được redirect về Return URL → để hiển thị kết quả
+
+VNPAY gửi gọi IPN URL → backend kiểm tra hash → cập nhật đơn hàng thành công thật
+
+IPN mới là bước quyết định giao dịch thành công.

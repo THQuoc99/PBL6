@@ -184,7 +184,7 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(ProductVariant)
 class ProductVariantAdmin(admin.ModelAdmin):
-    list_display = ('sku', 'product_link', 'color_with_image', 'size', 'price', 'stock_colored', 'is_active')
+    list_display = ('variant_id','sku', 'product_link', 'color_with_image', 'size', 'price', 'stock_colored', 'is_active', 'option_pretty')
     list_filter = ('is_active', 'product__category', 'product__store')
     search_fields = ('sku', 'product__name')
     readonly_fields = ('option_pretty',)  # <-- ĐÃ THÊM METHOD DƯỚI ĐÂY

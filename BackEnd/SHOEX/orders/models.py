@@ -4,17 +4,6 @@ from address.models import Address
 
 class Order(models.Model):
     """Đơn hàng chính"""
-    
-    STATUS_CHOICES = [
-        ('pending', 'Đang chờ'),
-        ('confirmed', 'Đã xác nhận'),
-        ('processing', 'Đang xử lý'),
-        ('shipped', 'Đã gửi hàng'),
-        ('delivered', 'Đã giao hàng'),
-        ('cancelled', 'Đã hủy'),
-        ('returned', 'Đã trả hàng'),
-    ]
-
     order_id = models.AutoField(
         primary_key=True,
         verbose_name="Mã đơn hàng"
@@ -27,46 +16,11 @@ class Order(models.Model):
         verbose_name="Người mua"
     )
     
-    address = models.ForeignKey(
-        Address,
-        on_delete=models.CASCADE,
-        related_name='orders',
-        verbose_name="Địa chỉ giao hàng"
-    )
-    
     total_amount = models.DecimalField(
         max_digits=12,
         decimal_places=2,
         verbose_name="Tổng tiền"
     )
-    
-    status = models.CharField(
-        max_length=20,
-        choices=STATUS_CHOICES,
-        default='pending',
-        verbose_name="Trạng thái đơn hàng"
-    )
-    
-    # Thông tin thanh toán
-    payment_method = models.CharField(
-        max_length=50,
-        blank=True,
-        null=True,
-        verbose_name="Phương thức thanh toán"
-    )
-    
-    payment_status = models.CharField(
-        max_length=20,
-        choices=[
-            ('pending', 'Chờ thanh toán'),
-            ('paid', 'Đã thanh toán'),
-            ('failed', 'Thanh toán thất bại'),
-            ('refunded', 'Đã hoàn tiền'),
-        ],
-        default='pending',
-        verbose_name="Trạng thái thanh toán"
-    )
-    
     shipping_fee = models.DecimalField(
         max_digits=10,
         decimal_places=2,
@@ -74,17 +28,19 @@ class Order(models.Model):
         verbose_name="Phí vận chuyển"
     )
     
-    notes = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name="Ghi chú"
-    )
-    
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Ngày tạo"
     )
-    
+    address = models.ForeignKey(
+        Address,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True, 
+        related_name='address_orders',
+        verbose_name="Địa chỉ giao hàng"
+    )
     updated_at = models.DateTimeField(
         auto_now=True,
         verbose_name="Ngày cập nhật"
@@ -106,14 +62,18 @@ class SubOrder(models.Model):
         primary_key=True,
         verbose_name="Mã đơn hàng con"
     )
-    
     order = models.ForeignKey(
         Order,
         on_delete=models.CASCADE,
         related_name='sub_orders',
         verbose_name="Đơn hàng chính"
     )
-    
+    shipping_fee = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0.00,
+        verbose_name="Phí vận chuyển"
+    )
     store = models.ForeignKey(
         'store.Store',
         on_delete=models.CASCADE,
@@ -126,33 +86,7 @@ class SubOrder(models.Model):
         decimal_places=2,
         verbose_name="Tổng tiền con"
     )
-    
-    status = models.CharField(
-        max_length=20,
-        choices=Order.STATUS_CHOICES,
-        default='pending',
-        verbose_name="Trạng thái"
-    )
-    
-    tracking_number = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        verbose_name="Mã vận đơn"
-    )
-    
-    shipped_at = models.DateTimeField(
-        blank=True,
-        null=True,
-        verbose_name="Ngày gửi hàng"
-    )
-    
-    delivered_at = models.DateTimeField(
-        blank=True,
-        null=True,
-        verbose_name="Ngày giao hàng"
-    )
-    
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Ngày tạo"
@@ -210,12 +144,7 @@ class OrderItem(models.Model):
         verbose_name="Giá tại thời điểm đặt hàng"
     )
     
-    discount_amount = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        default=0.00,
-        verbose_name="Số tiền giảm giá"
-    )
+
     
     class Meta:
         verbose_name = "Mục đơn hàng"

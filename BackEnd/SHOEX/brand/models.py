@@ -1,6 +1,9 @@
 from django.db import models
 
 class Brand(models.Model):
+    # Khai báo brand_id là khóa chính (Primary Key)
+    brand_id = models.AutoField(primary_key=True, verbose_name="ID Thương hiệu") 
+    
     name = models.CharField(max_length=255, unique=True, verbose_name="Tên thương hiệu")
     slug = models.SlugField(max_length=255, unique=True, blank=True, null=True)
     description = models.TextField(blank=True, null=True, verbose_name="Mô tả")

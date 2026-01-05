@@ -3,7 +3,7 @@
  */
 
 import { useRouter } from 'next/router';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../hooks/uses/useAuth';
 import { useEffect } from 'react';
 
 interface ProtectedRouteProps {

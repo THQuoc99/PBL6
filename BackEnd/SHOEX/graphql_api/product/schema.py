@@ -1,14 +1,15 @@
 # ===== IMPORTS =====
 from .ultis.ultis import get_base_product_queryset
 import graphene
-from django.db.models import Q, Sum, Avg, F, Case, When, BooleanField, Value, OuterRef, Subquery, FloatField, IntegerField
+from django.db.models import Q, Sum, Avg, F, Case, When, BooleanField, Value, OuterRef, Subquery, FloatField, IntegerField, Count
 from django.utils import timezone
 from datetime import timedelta
 from graphene import relay
 from promise import Promise
 from django.db.models.functions import Coalesce
 # ===== DJANGO MODELS =====
-from products.models import Product, ProductVariant, Category
+from products.models import Product, ProductVariant, Category, ProductAttribute
+from brand.models import Brand
 from graphene_django import DjangoConnectionField
 from .sort.sorting import ProductSortInput, apply_product_sorting
 from orders.models import OrderItem  # giả sử OrderItem có field created_at và variant liên kết ProductVariant
@@ -20,11 +21,10 @@ from .types.product import (
     ProductVariantType,
     ProductCountableConnection,
     ProductVariantCountableConnection,
-    
-    # Category related types
     CategoryType,
     CategoryCountableConnection
 )
+from .types.product import ProductAttributeType
 
 # ===== FILTER INPUTS =====
 from .filters.product_filters import (
@@ -42,14 +42,15 @@ from .filters.filtering import (
 # ===== MUTATIONS =====
 # Product & Variant mutations
 from .mutations.product_mutations import (
-    ProductCreate,
-    ProductUpdate,
     ProductDelete,
-    ProductVariantCreate,
-    ProductVariantUpdate,
-    ProductVariantDelete,
     StockUpdate,
     PriceUpdate
+)
+from .mutations.product_mutations import (
+    CreateProductFull,
+)
+from .mutations.product_mutations import (
+    UpdateProductFull,
 )
 
 # Category mutations
@@ -108,6 +109,13 @@ class ProductQueries(graphene.ObjectType):
             description="Sắp xếp theo: name_asc, name_desc, created_at_desc, product_count_desc"
         ),
         description="Danh sách tất cả danh mục với pagination"
+    )
+
+    # Product attribute definitions
+    product_attributes = graphene.List(
+        ProductAttributeType,
+        filter=graphene.Argument(graphene.String, description="Filter by attribute name"),
+        description="Danh sách định nghĩa thuộc tính (Size, Color...)"
     )
 
     # ===== PRODUCT QUERIES =====
@@ -234,19 +242,27 @@ class ProductQueries(graphene.ObjectType):
 
         return qs
 
+    def resolve_product_attributes(self, info, filter=None):
+        """Trả về danh sách ProductAttribute (có thể lọc theo tên)"""
+        qs = ProductAttribute.objects.all()
+        if filter:
+            qs = qs.filter(name__icontains=filter)
+        return qs
+
     
     # ===== PRODUCT RESOLVERS =====
     
     def resolve_product(self, info, id=None, slug=None):
-        """Resolve single product by ID or slug"""
+        """Resolve single product by ID or slug, lấy từ qs base annotate"""
+        qs = get_base_product_queryset()
         if id:
             try:
-                return Product.objects.get(product_id=id, is_active=True)
+                return qs.get(product_id=id)
             except Product.DoesNotExist:
                 return None
         elif slug:
             try:
-                return Product.objects.get(slug=slug, is_active=True)
+                return qs.get(slug=slug)
             except Product.DoesNotExist:
                 return None
         return None
@@ -280,6 +296,11 @@ class ProductQueries(graphene.ObjectType):
         sort_by = kwargs.get('sort_by', 'created_at_desc')
         qs = apply_product_sorting(qs, sort_by)
 
+        # Debug: In ra 3 sản phẩm đầu để kiểm tra sort
+        import logging
+        logger = logging.getLogger(__name__)
+        for i, p in enumerate(qs[:3]):
+            logger.info(f"Product {i}: ID={p.product_id}, variant_min_price={getattr(p, 'variant_min_price', 'N/A')}, base_price={p.base_price}")
 
         return qs
     
@@ -361,23 +382,17 @@ class ProductMutations(graphene.ObjectType):
     category_create = CategoryCreate.Field()
     category_update = CategoryUpdate.Field()
     category_delete = CategoryDelete.Field()
-    
-    # ===== PRODUCT MUTATIONS =====
-    # Product CRUD operations
-    product_create = ProductCreate.Field()
-    product_update = ProductUpdate.Field()
-    product_delete = ProductDelete.Field()
-    
-    # ===== PRODUCT VARIANT MUTATIONS =====
-    # Product variant CRUD operations
-    product_variant_create = ProductVariantCreate.Field()
-    product_variant_update = ProductVariantUpdate.Field()
-    product_variant_delete = ProductVariantDelete.Field()
+
     
     # ===== STOCK & PRICE MUTATIONS =====
     # Inventory and pricing operations
     stock_update = StockUpdate.Field()
     price_update = PriceUpdate.Field()
+    
+    # ===== FULL PRODUCT MUTATION =====
+    # Full product creation (with uploads)
+    create_product_full = CreateProductFull.Field()
+    update_product_full = UpdateProductFull.Field()
     
     # ===== IMAGE MUTATIONS =====
     # Image upload and management operations
@@ -418,8 +433,6 @@ __all__ = [
     'ProductMutations'
 ]
 
-# Đảm bảo tên export đúng để import từ api.py
-# Đổi tên class nếu cần, hoặc thêm alias cuối file
 ProductQuery = ProductQueries
 ProductMutation = ProductMutations
 

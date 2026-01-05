@@ -234,6 +234,23 @@ export class AuthService {
     }
   }
 
+  // Gọi API không cần xác thực
+  async publicApiCall(query: string, variables?: any): Promise<ApiResponse> {
+    try {
+      const response = await fetch(this.API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, variables }),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Public API call error:', error);
+      throw error;
+    }
+  }
+
   // Gọi API với authentication tự động
   async apiCall(query: string, variables?: any): Promise<ApiResponse> {
     let { accessToken } = this.getTokens();
@@ -253,28 +270,20 @@ export class AuthService {
     }
 
     try {
-      console.log('🌐 Making API call with token:', !!accessToken);
-      console.log('🌐 Authorization header:', `Bearer ${accessToken?.substring(0, 20)}...`);
-      
       const response = await fetch(this.API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`, // ĐÂY LÀ CÁCH DÙNG ACCESS TOKEN!
+          'Authorization': `Bearer ${accessToken}`,
         },
+        credentials: 'include', // 🔑 Gửi/nhận cookies
         body: JSON.stringify({ query, variables }),
       });
 
-      console.log('📡 API Response status:', response.status);
-      console.log('📡 API Response headers:', Object.fromEntries(response.headers.entries()));
-
       // Kiểm tra nếu server trả về 401 (Unauthorized)
       if (response.status === 401) {
-        console.log('Server trả về 401, token không hợp lệ');
         const refreshed = await this.refreshToken();
-
         if (refreshed) {
-          // Thử lại với token mới
           const newAccessToken = localStorage.getItem('accessToken');
           const retryResponse = await fetch(this.API_URL, {
             method: 'POST',
@@ -282,16 +291,15 @@ export class AuthService {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${newAccessToken}`,
             },
+            credentials: 'include', // 🔑 Gửi/nhận cookies
             body: JSON.stringify({ query, variables }),
           });
-
           return await retryResponse.json();
         } else {
           this.logout();
           throw new Error('Authentication failed');
         }
       }
-
       return await response.json();
     } catch (error) {
       console.error('API call error:', error);
@@ -303,7 +311,6 @@ export class AuthService {
   logout() {
     this.clearTokens();
     this.notifyAuthStateChange();
-    // Không tự động redirect, để component xử lý
   }
 
   // Kiểm tra đã đăng nhập chưa

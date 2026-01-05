@@ -1,4 +1,5 @@
 from discount.models import Voucher
+import json
 import graphene
 from graphene import relay
 from graphene_django import DjangoObjectType
@@ -13,10 +14,11 @@ from .utils import get_max_discount
 from django.db.models import Q, Max
 from django.utils import timezone
 from decimal import Decimal
-class BrandType(DjangoObjectType):
-    class Meta:
-        model = Brand
-        fields = "__all__"
+from graphql_api.brand.type.type import BrandType
+# class BrandType(DjangoObjectType):
+#     class Meta:
+#         model = Brand
+#         fields = "__all__"
 
 class CategoryType(DjangoObjectType):
     """Danh mục sản phẩm - Cây phân cấp"""
@@ -89,12 +91,25 @@ class ProductImageType(DjangoObjectType):
     def resolve_image_url(self, info):
         """Trả về URL của ảnh"""
         if self.image and hasattr(self.image, 'url'):
-            return self.image.url
+            image_url = self.image.url
+            try:
+                if info.context:
+                    return info.context.build_absolute_uri(image_url)
+            except Exception:
+                pass
+            return image_url
         return None
 
 
 class ProductAttributeType(DjangoObjectType):
     """Thuộc tính sản phẩm (Size, Color, Material...)"""
+    # Force `name` to be exposed as a String (Graphene-Django converts
+    # model fields with `choices` into Enums by default which yields
+    # uppercase enum member names). We explicitly declare fields here so
+    # the API returns the DB value (e.g. 'style', 'color').
+    name = graphene.String()
+    name_display = graphene.String(description="Label (human readable) for the name")
+
     class Meta:
         model = ProductAttribute
         fields = '__all__'
@@ -106,6 +121,17 @@ class ProductAttributeType(DjangoObjectType):
     def resolve_option_count(self, info):
         """Đếm số lượng tùy chọn của thuộc tính này"""
         return self.product_options.filter(is_available=True).count()
+
+    def resolve_name(self, info):
+        """Trả về giá trị lưu trong DB (ví dụ 'style', 'color') không ép hoa."""
+        return self.name
+
+    def resolve_name_display(self, info):
+        """Trả về nhãn hiển thị (ví dụ 'Kiểu dáng') từ choices."""
+        try:
+            return self.get_name_display()
+        except Exception:
+            return None
 
 
 class ProductAttributeOptionType(DjangoObjectType):
@@ -121,7 +147,13 @@ class ProductAttributeOptionType(DjangoObjectType):
     def resolve_image_url(self, info):
         """Trả về URL của ảnh tùy chọn"""
         if self.image and hasattr(self.image, 'url'):
-            return self.image.url
+            image_url = self.image.url
+            try:
+                if info.context:
+                    return info.context.build_absolute_uri(image_url)
+            except Exception:
+                pass
+            return image_url
         return None
     
     # Thêm thông tin động
@@ -173,18 +205,45 @@ class ProductVariantType(DjangoObjectType):
         return self.price * (Decimal('1.0') - discount / Decimal('100.0'))
     
     def resolve_color_name(self, info):
-        """Lấy tên màu từ option_combinations"""
-        return self.color_name
-    
+        if not self.option_combinations:
+            return None
+
+        # Nếu option_combinations là str, parse nó
+        if isinstance(self.option_combinations, str):
+            try:
+                data = json.loads(self.option_combinations)
+            except json.JSONDecodeError:
+                return None
+        else:
+            data = self.option_combinations
+
+        return data.get("Color") or data.get("Màu Sắc")
+
     def resolve_size_name(self, info):
-        """Lấy size từ option_combinations"""
-        return self.size_name
-    
+        if not self.option_combinations:
+            return None
+
+        if isinstance(self.option_combinations, str):
+            try:
+                data = json.loads(self.option_combinations)
+            except json.JSONDecodeError:
+                return None
+        else:
+            data = self.option_combinations
+
+        return data.get("Size")
+        
     def resolve_color_image_url(self, info):
-        """Lấy ảnh màu tương ứng"""
-        color_image = self.color_image
-        if color_image and color_image.image and hasattr(color_image.image, 'url'):
-            return color_image.image.url
+        """
+        Quan trọng: Gọi property `variant_image` thông minh từ Model.
+        Đồng thời convert sang Absolute URL (có http://...)
+        """
+        image_url = self.variant_image  # Gọi logic từ Model
+        if image_url:
+            # Nếu chạy trong context request, tạo full domain url
+            if info.context:
+                return info.context.build_absolute_uri(image_url)
+            return image_url
         return None
     
     def resolve_stock_status(self, info):
@@ -252,18 +311,20 @@ class ProductType(DjangoObjectType):
     
     def resolve_price_range(self, info):
         """Khoảng giá từ variants"""
-        min_p, max_p = self.min_price, self.max_price
+        # Sử dụng annotation nếu có, fallback về property
+        min_p = getattr(self, 'variant_min_price', None) or self.min_price
+        max_p = getattr(self, 'variant_max_price', None) or self.max_price
         if min_p == max_p:
             return f"{min_p:,.0f}đ"
         return f"{min_p:,.0f}đ - {max_p:,.0f}đ"
     
     def resolve_min_price(self, info):
-        """Giá thấp nhất (sử dụng property từ model)"""
-        return self.min_price
+        """Giá thấp nhất (ưu tiên annotation variant_min_price)"""
+        return getattr(self, 'variant_min_price', None) or self.min_price
     
     def resolve_max_price(self, info):
-        """Giá cao nhất (sử dụng property từ model)"""
-        return self.max_price
+        """Giá cao nhất (ưu tiên annotation variant_max_price)"""
+        return getattr(self, 'variant_max_price', None) or self.max_price
 
 
     def resolve_discount_percentage(self, info):
@@ -276,14 +337,7 @@ class ProductType(DjangoObjectType):
     def resolve_has_discount(self, info):
         """Có giảm giá không"""
         # Always use the resolver for discount_percentage, not a model attribute
-        discount = None
-        # Try to use the resolver if present
-        if hasattr(self, 'resolve_discount_percentage'):
-            discount = self.resolve_discount_percentage(info)
-        elif hasattr(self, 'discount_percentage'):
-            discount = self.discount_percentage
-        else:
-            discount = 0.0
+        discount = get_max_discount(self)
         return discount > 0
     
     # ===== HÌNH ẢNH THEO MODEL MỚI =====
@@ -317,14 +371,14 @@ class ProductType(DjangoObjectType):
     def resolve_color_options(self, info):
         """Tùy chọn màu sắc"""
         return self.attribute_options.filter(
-            attribute__name='Color',
+            attribute__name='color',
             is_available=True
         )
     
     def resolve_size_options(self, info):
         """Tùy chọn kích thước"""
         return self.attribute_options.filter(
-            attribute__name='Size',
+            attribute__name='size',
             is_available=True
         )
     
@@ -342,8 +396,9 @@ class ProductType(DjangoObjectType):
     
     def resolve_available_colors_count(self, info):
         """Số màu có sẵn"""
+        # ensure we filter by DB value (lowercase 'color')
         return self.attribute_options.filter(
-            attribute__name='Color',
+            attribute__name='color',
             is_available=True
         ).count()
     

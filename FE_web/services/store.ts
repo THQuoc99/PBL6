@@ -53,7 +53,7 @@ export class StoreService {
     localStorage.removeItem(CURRENT_STORE_KEY);
   }
 
-  // Lấy store hiện tại (ưu tiên localStorage → mới gọi API nếu chưa có)
+  // Lấy store hiện tại (ưu t iên localStorage → mới gọi API nếu chưa có)
   async getCurrentStore(): Promise<any | null> {
     // 1. Ưu tiên lấy từ localStorage
     const cached = this.getStoredStore();
@@ -66,6 +66,7 @@ export class StoreService {
       console.log('Không có userId, không thể lấy store');
       return null;
     }
+    console.log('userId:', userId);
     // 2. Nếu chưa có thì gọi API
     return await this.loadMyOwnedStore(userId);
   }

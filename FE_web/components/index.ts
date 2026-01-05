@@ -33,6 +33,7 @@ export { default as PromotionsPage } from './pages/seller/PromotionsPage';
 export { default as PaymentsPage } from './pages/seller/PaymentsPage';
 export { default as SettingsPage } from './pages/seller/SettingsPage';
 export { default as ChatbotAIPage } from './pages/seller/ChatbotAIPage';
+export { default as DashboardPage } from './pages/seller/DashboardPage';
 
 // Special Components
 export { default as AskAI } from './AskAI';

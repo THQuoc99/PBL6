@@ -203,17 +203,19 @@ class Product(models.Model):
         return self.color_images.filter(is_available=True)
     
 
-
-
 class ProductAttribute(models.Model):
     """Định nghĩa các thuộc tính có thể có (Size, Color, Material, Style...)"""
     ATTRIBUTE_TYPE_CHOICES = [
-        ('select', 'Lựa chọn từ danh sách'),
-        ('color', 'Màu sắc (có ảnh)'),
-        ('text', 'Nhập text'),
-        ('number', 'Số'),
+        ('variant', 'Biến thể'),
+        ('spec', 'Thông số kĩ thuật'),
     ]
-    
+    ATTRIBUTE_NAME_CHOICES = [
+        ('color', 'Màu Sắc'),
+        ('size', 'Size'),
+        ('material', 'Chất Liệu'),
+        ('style', 'Kiểu dáng'),
+        ('custom', 'Khác'),
+    ]
     attribute_id = models.AutoField(
         primary_key=True,
         verbose_name="Mã thuộc tính"
@@ -221,12 +223,14 @@ class ProductAttribute(models.Model):
     name = models.CharField(
         max_length=50,
         unique=True,
+        choices=ATTRIBUTE_NAME_CHOICES,
         verbose_name="Tên thuộc tính",
-        help_text="VD: Size, Color, Material, Style, Storage..."
+        help_text="VD: Size, Color, Material, Style..."
     )
     type = models.CharField(
-        max_length=10,
+        max_length=20,
         choices=ATTRIBUTE_TYPE_CHOICES,
+        default='variant',       # <--- THÊM CHỖ NÀY
         verbose_name="Loại thuộc tính"
     )
     is_required = models.BooleanField(
@@ -426,7 +430,59 @@ class ProductVariant(models.Model):
 
     def __str__(self):
         return f"{self.product.name} - {self.sku}"
+    def get_option_value(self, attribute_name):
+        """Helper để lấy giá trị từ JSON an toàn"""
+        try:
+            options = self.option_combinations
+            if isinstance(options, str):
+                options = json.loads(options)
+            # Tìm key không phân biệt hoa thường hoặc khớp chính xác
+            # Giả sử bạn lưu key là 'color' hoặc 'Màu Sắc'
+            for key, value in options.items():
+                if key.lower() == attribute_name.lower():
+                    return value
+            return None
+        except (json.JSONDecodeError, AttributeError):
+            return None
 
+    @property
+    def variant_image(self):
+        """
+        Tự động tìm ảnh đại diện cho biến thể này.
+        Logic:
+        1. Tìm trong attribute options xem cái nào có ảnh (ưu tiên Color).
+        2. Nếu không có, lấy ảnh đại diện của Product cha.
+        """
+        # 1. Lấy tất cả các options của Product cha mà có ảnh (thường là Màu sắc)
+        # Lưu ý: attribute__name='color' dựa trên choices của bạn
+        image_options = self.product.attribute_options.filter(
+            attribute__has_image=True
+        )
+
+        current_options = self.option_combinations
+        if isinstance(current_options, str):
+            try:
+                current_options = json.loads(current_options)
+            except json.JSONDecodeError:
+                current_options = {}
+
+        # 2. So khớp giá trị trong JSON của Variant với Option trong Database
+        for option in image_options:
+            # Lấy tên thuộc tính (VD: 'color')
+            attr_name = option.attribute.name 
+            
+            # Lấy giá trị variant đang chọn cho thuộc tính đó (VD: 'Đen')
+            # Cần đảm bảo key trong JSON khớp với tên attribute hoặc handle mapping
+            variant_val = current_options.get(attr_name) or current_options.get(option.attribute.get_name_display())
+
+            if variant_val == option.value and option.image:
+                return option.image.url
+
+        # 3. Fallback: Nếu không tìm thấy ảnh option, trả về ảnh thumbnail của Product cha
+        if self.product.gallery_images.filter(is_thumbnail=True).exists():
+             return self.product.gallery_images.filter(is_thumbnail=True).first().image.url
+        
+        return None
     @property
     def color_name(self):
         """Lấy tên màu từ option_combinations"""
